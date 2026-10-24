@@ -41,7 +41,7 @@ it("shows the example inside the page frame, with the label above the field", as
   expect(field.getAttribute("autocomplete")).toBe("given-name");
   expect(screen.getByText("Your name").compareDocumentPosition(field)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(screen.getByRole("heading", { level: 1 }).closest("main")).not.toBeNull();
-  expect(screen.getByRole("link", { name: "WongStack" }).getAttribute("href")).toBe("/");
+  expect(screen.getByRole("link", { name: "ROAM" }).getAttribute("href")).toBe("/");
 
   const message = screen.getByText("Your greeting will appear here.");
   expect(message.getAttribute("aria-live")).toBe("polite");

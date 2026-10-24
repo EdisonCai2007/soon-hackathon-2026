@@ -58,7 +58,7 @@ it("gives every page one frame: the bar's contents and the page share a width an
   expect(page.className.split(" ")).toEqual(expect.arrayContaining(frame));
   expect(page.className).not.toContain("max-w-lg");
   // The bar spans the screen; what it holds sits in the same frame, so the logo starts where a heading does.
-  const bar = screen.getByRole("link", { name: "WongStack" }).closest("header")!;
+  const bar = screen.getByRole("link", { name: "ROAM" }).closest("header")!;
   expect(bar.parentElement).toBe(page.parentElement);
   expect(bar.className).not.toMatch(/max-w-|mx-auto|px-/);
   // The bar stays in view at one height, so a panel beside the page can start right under it.

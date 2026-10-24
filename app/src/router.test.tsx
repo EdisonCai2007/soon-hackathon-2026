@@ -23,10 +23,10 @@ it("shows the home page at /, inside the page frame", async () => {
   expect(heading.textContent).toBe("Your workspace, shaped around you");
   expect(heading.closest("main")).not.toBeNull();
   expect(screen.queryByText("Page not found")).toBeNull();
-  const brand = screen.getByRole("link", { name: "WongStack" });
+  const brand = screen.getByRole("link", { name: "ROAM" });
   expect(brand.getAttribute("href")).toBe("/");
   expect(brand.closest("header")).not.toBeNull();
-  expect(brand.querySelector("img")?.getAttribute("alt")).toBe("");
+  expect(brand.querySelector("img")).toBeNull();
 });
 
 it("offers Sign out on every page of a site with a sign-in, in the bar and outside the page's column", async () => {
@@ -37,7 +37,7 @@ it("offers Sign out on every page of a site with a sign-in, in the bar and outsi
     // A plain link to the address the sign-in itself serves: the browser leaves the app for it.
     const out = await screen.findByRole("link", { name: "Sign out" });
     expect(out.getAttribute("href"), path).toBe("/cdn-cgi/access/logout");
-    expect(out.closest("header")?.contains(screen.getByRole("link", { name: "WongStack" })), path).toBe(true);
+    expect(out.closest("header")?.contains(screen.getByRole("link", { name: "ROAM" })), path).toBe(true);
     expect(out.closest("main"), path).toBeNull();
     cleanup();
   }
@@ -50,7 +50,7 @@ it("offers no Sign out on an open site, on a local run, or while the answer is u
     vi.stubGlobal("fetch", vi.fn(async () => answer()));
     await open("/nothing");
 
-    expect(screen.getByRole("link", { name: "WongStack" }), String(at)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "ROAM" }), String(at)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Sign out" }), String(at)).toBeNull();
     cleanup();
   }
@@ -79,7 +79,7 @@ it("says a deeper unknown address is not found too", async () => {
 
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page not found");
   await act(async () => {
-    fireEvent.click(screen.getByRole("link", { name: "WongStack" }));
+    fireEvent.click(screen.getByRole("link", { name: "ROAM" }));
   });
   expect(router.state.location.pathname).toBe("/");
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Your workspace, shaped around you");
@@ -90,7 +90,7 @@ it("shows a mini app at its own address, inside the page frame", async () => {
 
   const heading = await screen.findByRole("heading", { level: 1, name: "Hello" });
   expect(heading.closest("main")).not.toBeNull();
-  expect(screen.getByRole("link", { name: "WongStack" }).closest("header")).not.toBeNull();
+  expect(screen.getByRole("link", { name: "ROAM" }).closest("header")).not.toBeNull();
   expect(screen.queryByText("Page not found")).toBeNull();
 });
 
