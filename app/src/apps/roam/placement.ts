@@ -12,10 +12,21 @@ const median = (values: number[]): number => {
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[Math.floor(middle)]
 }
 
-/** The floor the figures stand on: the lowest the scan goes. */
-export const floorHeight = (scene: Scene): number => scene.bounds[0][1]
+/** How far below a floor a height still counts as standing on it, in scan units: a phone held a little low. */
+const FLOOR_SLACK = 0.3
 
-const eyeHeight = (scene: Scene): number => median(scene.cameras.map((camera) => camera.eye[1])) - floorHeight(scene)
+/** The scan's floors, lowest first: the heights it lists, else the lowest it goes. */
+const floors = (scene: Scene): number[] => (scene.floors ? [...scene.floors].sort((one, two) => one - two) : [scene.bounds[0][1]])
+
+/** The floor under a height: the highest floor at or below it, else the lowest. With no height, the top floor. */
+export const floorHeight = (scene: Scene, above = Infinity): number => {
+  const all = floors(scene)
+  const under = all.filter((floor) => floor <= above + FLOOR_SLACK)
+  return under.length > 0 ? under[under.length - 1] : all[0]
+}
+
+const eyeHeight = (scene: Scene): number =>
+  median(scene.cameras.map(({ eye }) => eye[1] - floorHeight(scene, eye[1])))
 
 /** Scan units to the metre, from the height the scan was filmed at. Tune PHONE_HEIGHT_M, not this. */
 export const unitsPerMetre = (scene: Scene): number => eyeHeight(scene) / PHONE_HEIGHT_M
@@ -29,11 +40,11 @@ export const figureSize = (scene: Scene): { height: number; width: number } => {
 export const sceneExtent = ({ bounds: [low, high] }: Scene): number => Math.max(high[0] - low[0], high[2] - low[2])
 
 /** The spot in the real room that is taped on the floor, taken from one of the scan's own cameras. */
-export type Anchor = { x: number; z: number; yaw: number }
+export type Anchor = { x: number; z: number; yaw: number; floor: number }
 
 export function anchorAt(scene: Scene, index: number): Anchor {
   const { eye, target } = scene.cameras[Math.min(Math.max(index, 0), scene.cameras.length - 1)]
-  return { x: eye[0], z: eye[2], yaw: Math.atan2(target[0] - eye[0], target[2] - eye[2]) }
+  return { x: eye[0], z: eye[2], yaw: Math.atan2(target[0] - eye[0], target[2] - eye[2]), floor: floorHeight(scene, eye[1]) }
 }
 
 /** A phone's own tracking, in metres from where it was lined up, turned into a place in the scan. */
@@ -43,14 +54,14 @@ export function toScanPose(ar: Pose, anchor: Anchor, scene: Scene): Pose {
   const cos = Math.cos(anchor.yaw)
   return {
     x: anchor.x + (ar.x * cos + ar.z * sin) * scale,
-    y: floorHeight(scene) + ar.y * scale,
+    y: anchor.floor + ar.y * scale,
     z: anchor.z + (ar.z * cos - ar.x * sin) * scale,
     yaw: anchor.yaw + ar.yaw,
   }
 }
 
-/** A guest's figure stands where their own view stands, with both feet on the floor. */
-export const standing = (pose: Pose, scene: Scene): Pose => ({ ...pose, y: floorHeight(scene) })
+/** A guest's figure stands where their own view stands, with both feet on the floor under it. */
+export const standing = (pose: Pose, scene: Scene): Pose => ({ ...pose, y: floorHeight(scene, pose.y) })
 
 /** Turned to face the viewer, upright, however far above or below the viewer is. */
 export const billboardYaw = (figure: { x: number; z: number }, camera: { x: number; z: number }): number =>

@@ -3,8 +3,8 @@ import { z } from 'zod'
 
 const vec3 = z.tuple([z.number(), z.number(), z.number()])
 
-// The scan's details from Edison's pipeline (splat_scene.json): how to turn the PLY upright, its bounds, and the
-// source video's camera spots. Fields the viewer doesn't use are ignored.
+// The scan's details from Edison's pipeline (splat_scene.json): how to turn the PLY upright, its bounds, camera
+// spots and, for several floors, their heights. Fields the viewer doesn't use are ignored.
 const sceneSchema = z.object({
   splats: z.number().int().positive(),
   views: z.number().int().positive(),
@@ -12,6 +12,7 @@ const sceneSchema = z.object({
   cutHeight: z.number(),
   rotation: z.tuple([vec3, vec3, vec3]),
   translation: vec3,
+  floors: z.array(z.number()).min(1).optional(),
   cameras: z.array(z.object({
     name: z.string().min(1),
     eye: vec3,

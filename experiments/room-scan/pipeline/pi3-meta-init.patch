@@ -1,0 +1,13 @@
+diff --git a/pi3/models/dinov2/models/vision_transformer.py b/pi3/models/dinov2/models/vision_transformer.py
+index 73f15cf..021c65b 100644
+--- a/pi3/models/dinov2/models/vision_transformer.py
++++ b/pi3/models/dinov2/models/vision_transformer.py
+@@ -117,7 +117,7 @@ class DinoVisionTransformer(nn.Module):
+         if drop_path_uniform is True:
+             dpr = [drop_path_rate] * depth
+         else:
+-            dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
++            dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth, device='cpu')]  # scalar configuration, including meta initialization
+ 
+         if ffn_layer == "mlp":
+             # logger.info("using MLP layer as FFN")
