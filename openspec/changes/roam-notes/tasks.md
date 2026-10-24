@@ -1,0 +1,46 @@
+# Tasks
+
+## 1. Check the phone first
+
+- [ ] 1.1 On a real Android phone, in a throwaway page served over HTTPS (`cloudflared tunnel --url`, as [AR in the browser](../../../wiki/development/ar-in-the-browser.md#trying-it-on-a-real-phone) describes): request `immersive-ar` with `optionalFeatures: ['dom-overlay']` and `domOverlay: { root }`, and confirm a button drawn over the camera view is visible and tappable while a pose is still arriving each frame. Record which it is: overlay, or the fallback flow in [the design](design.md#the-phone-flow-and-the-thing-that-must-be-checked-first). `(outward — needs the owner's phone)`
+- [ ] 1.2 In the same page, confirm what is reachable during a live session: `getUserMedia({ audio: true })` for a clip, and a camera frame for a photo. Where ARCore holds the camera, note whether the system camera through a file input works instead. `(outward — needs the owner's phone)`
+- [ ] 1.3 Write what was found into [AR in the browser](../../../wiki/development/ar-in-the-browser.md), beside the lining-up section, so the next change does not retry it.
+
+## 2. The place and its notes, on the server
+
+- [x] 2.1 Add one additive migration to `schema/migrations/` creating `roam_notes` (place, id, kind, x, y, z, yaw, author, words, media, media_type, secret_hash, created_at; primary key `(place, id)`; indexed by place) and `roam_places` (place, keeper_hash, created_at), with a header comment saying what each holds, by the shape of `20261022120000_inbox.sql`.
+- [x] 2.2 Write `app/worker/apps/roam/notes.ts`: the caps from [the design](design.md#the-caps), the checks on a leaving note (kind, position within the scan's limits, words, media type and size, the place's note count), the row-to-wire shaping the list answers with, and the hashing of an author secret and a keeper key. No D1 and no `Request` in this file. **Changed in the build:** the hashing went to `ids.ts` beside the secrets it hashes and the constant-time comparison it is used with, so `notes.ts` stayed free of `crypto`; a position is held to the live room's own limits by exporting `readPose` from `wire.ts` rather than repeating them.
+- [x] 2.3 Write `notes.test.ts` beside it: each cap refused with its reason, a position outside the scan refused, each kind accepted with only the fields it may carry, and a hash compared against the right and the wrong secret. The hash's tests sit in `ids.test.ts`, where the hashing landed.
+- [x] 2.4 Add `noteId`, `noteSecret` and `keeperKey` to `app/worker/apps/roam/ids.ts` with their readers, reusing `sameKey` for the comparison, and extend `ids.test.ts`.
+- [x] 2.5 Write `app/worker/apps/roam/note-routes.ts`: `GET notes`, `GET note-media`, `POST note` (multipart, refused on `Content-Length` then on the bytes read), `DELETE note` (the author's secret or the keeper's key), `POST place` (minted once, a second claim refused), each over `env.DB` with bound statements.
+- [x] 2.6 List the five routes in `app/worker/apps/roam/api.ts` as bare handlers, listing no saved key, and extend `api.test.ts`: a note left and listed back, bytes fetched with their type and an immutable cache header, a refused cap, a removal by each of the two permitted holders and a refusal for anyone else, and a second claim refused. **Changed in the build:** the routes' tests went in `note-routes.test.ts` beside the handlers, leaving `api.test.ts` to the room, because they need the database stand-in and the room's tests need none.
+- [x] 2.7 Add sample notes to `schema/seed.sql` — one of each kind, on both floors, in the scan's own coordinates, nothing anybody real said — so a preview and a walk start from real rows.
+
+## 3. The phone leaves a note
+
+- [ ] 3.1 Write `app/src/apps/roam/spots.ts` and its test: the marked spots as a name and a camera index each, resolved through `anchorAt`, with an index past the scene's cameras refused.
+- [ ] 3.2 Extend `app/src/apps/roam/ar-session.ts` for the DOM overlay as task 1 settled it, keeping `startAr`'s current shape for the camera screen, and extend `ar-session.test.ts`.
+- [ ] 3.3 Write `app/src/apps/roam/notes.ts` (browser) and its test: fetching the list, posting a note as multipart, the author secrets kept in `localStorage`, shrinking a photo to the cap, and the pose a note is left at from the phone's own pose.
+- [ ] 3.4 Write `app/src/apps/roam/Leave.tsx` and `Leave.test.tsx`: pick a spot, walk, *Leave a note here*, the three kinds, *Leave it*, the count, *Line up again*, the refused-cap state, and the no-AR state that offers the ordinary scan — phone layout, by [the UX section](design.md#ux).
+- [ ] 3.5 Add the `leave` arrival and its link to `app/src/apps/roam/invite.ts`, route it in `App.tsx`, and extend both tests.
+
+## 4. The scan shows them
+
+- [ ] 4.1 Add a note's pose to `app/src/apps/roam/placement.ts` and extend `placement.test.ts`.
+- [ ] 4.2 Give `app/src/apps/roam/stage.ts` a marker group beside the figures, and change `pick` to return what kind of thing was hit; extend `stage.test.ts` and every caller.
+- [ ] 4.3 Write `app/src/apps/roam/note-sound.ts` and its test: a fetched clip played through a panner at the note's position, reusing `gainFor`, stopped and disconnected when the panel closes.
+- [ ] 4.4 Write `app/src/apps/roam/Notes.tsx` and `Notes.test.tsx`: the count in the bar, the panel for each kind, *Play from here*, *Remove* shown only to the author or the keeper, and the empty state that says the place holds no notes.
+- [ ] 4.5 Wire the notes through `RoomViewer.tsx` and `Scan.tsx` — the list fetched once, markers drawn, a marker press opening the panel, and the phone link for the keeper — and extend `RoomViewer.test.tsx` and `Scan.test.tsx`.
+
+## 5. The scale, and what people are told
+
+- [ ] 5.1 Pace a measured distance in the real home and the same distance in the scan, set `PHONE_HEIGHT_M` in `app/src/apps/roam/placement.ts` from it, and write the measurement into the wiki. `(outward — needs the owner in the home)`
+- [ ] 5.2 Pick the marked spots by eye on the preview, name them in plain words, and tape them in the real home. `(outward — needs the owner in the home)`
+- [ ] 5.3 Write `wiki/stack/places-and-notes.md` — a lasting place beside a live room, where its bytes live and why not R2, the caps, the author secret and the keeper key, and the marked spots — and link it from `wiki/stack/README.md` and from [live rooms](../../../wiki/stack/live-rooms.md).
+
+## 6. Verification
+
+- [ ] 6.1 From `app/`, run `npm test`: lint, types, every-line coverage over both roam folders, the runtime tests, knip, repeated code, and the key and action checks. Report any failure that was already there on a clean tree.
+- [ ] 6.2 `/save`, then walk the deployed staging Worker's own address — [a room costs the app its version previews](../../../wiki/stack/live-rooms.md#a-room-costs-the-app-its-version-previews), so there is no per-commit alias: the seeded notes show as markers, each panel opens, a clip plays and moves with the camera, and the place's count is right.
+- [ ] 6.3 In the real home, from the phone: line up on a taped spot, leave one note of each kind at three known things, then open the plain link on a laptop and confirm each sits beside the thing it describes, on the right floor. Close the tab, reopen it, and confirm they are all still there. `(outward — needs the owner in the home)`
+- [ ] 6.4 Confirm removal on the live app: the author's own browser removes its note, another browser cannot, and the keeper can.

@@ -2,6 +2,7 @@
 // Object named by its id, so a link reaches the same room from anywhere. wiki/stack/mini-apps.md
 import type { Route } from "../../api/contract.ts";
 import { isRoomId, roomId } from "./ids.ts";
+import { noteRoutes } from "./note-routes.ts";
 
 // `Env` is the Worker's own binding list; the dispatcher hands a handler its own copy of it.
 type Rooms = Pick<Env, "ROAM_ROOMS">;
@@ -40,4 +41,10 @@ export const routes = new Map<string, Route>([
   ["POST room", start],
   ["GET socket", join],
   ["GET members", members],
+  // The place and what is left in it: lasting, and read by anyone holding the app's own address.
+  ["GET notes", noteRoutes.notes],
+  ["GET note-media", noteRoutes.noteMedia],
+  ["POST note", noteRoutes.leaveNote],
+  ["DELETE note", noteRoutes.removeNote],
+  ["POST place", noteRoutes.claimPlace],
 ]);
