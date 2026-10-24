@@ -15,6 +15,9 @@ import { refreshOnSchedule } from "./employee-access/pushers.ts";
 import { handleAccess } from "./employee-access/router.ts";
 import { setupFile } from "./employee-access/setup-file.ts";
 
+// A Durable Object class reaches the runtime only from the Worker's entry: the ROAM app's live room.
+export { RoamRoom } from "./apps/roam/room.ts";
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);

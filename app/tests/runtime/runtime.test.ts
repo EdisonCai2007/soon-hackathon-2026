@@ -98,6 +98,51 @@ it("rolls back the whole D1 batch when its final audit insert fails", async () =
   expect(await snapshot(runtime.env.DB)).toEqual(before);
 });
 
+it("runs a real ROAM room: two people join one link, see each other, and one leaves", async () => {
+  const started = await request("/apps/roam/api/room", signed.owner, {});
+  expect(started.status).toBe(200);
+  const { roomId } = await started.json() as { roomId: string; hostKey: string };
+
+  const open = async (name: string) => {
+    const response = await runtime.worker.fetch(`${site.origin}/apps/roam/api/socket?id=${roomId}&name=${name}`, {
+      headers: { "Cf-Access-Jwt-Assertion": signed.owner, Upgrade: "websocket" },
+    });
+    expect(response.status).toBe(101);
+    const socket = response.webSocket!;
+    const heard: Record<string, unknown>[] = [];
+    socket.addEventListener("message", event => heard.push(JSON.parse(event.data as string)));
+    socket.accept();
+    return { socket, heard };
+  };
+  const settle = () => new Promise(resolve => setTimeout(resolve, 150));
+
+  const first = await open("Jo");
+  const second = await open("Sam");
+  await settle();
+  expect(first.heard[0]).toMatchObject({ type: "welcome", self: { name: "Jo" }, members: [] });
+  expect(second.heard[0]).toMatchObject({ type: "welcome", members: [{ name: "Jo" }] });
+  expect(first.heard[1]).toMatchObject({ type: "joined", member: { name: "Sam" } });
+
+  const pose = { x: 0.5, y: -1, z: 0.25, yaw: 1 };
+  second.socket.send(JSON.stringify({ type: "pose", pose }));
+  await settle();
+  expect(first.heard.at(-1)).toMatchObject({ type: "pose", pose });
+
+  // The host's list, while both are still in. The room reports them in no particular order.
+  const list = await request(`/apps/roam/api/members?id=${roomId}`);
+  const { members } = await list.json() as { members: { name: string }[] };
+  expect(members.map(member => member.name).sort()).toEqual(["Jo", "Sam"]);
+
+  second.socket.close();
+  await settle();
+  expect(first.heard.at(-1)).toMatchObject({ type: "left" });
+
+  // Another link is another room, and knows nobody.
+  const elsewhere = await request(`/apps/roam/api/members?id=${"a".repeat(20)}`);
+  expect(await elsewhere.json()).toEqual({ members: [] });
+  first.socket.close();
+});
+
 it("resets the previous scenario's members and failing trigger", async () => {
   expect((await runtime.env.DB.prepare("SELECT * FROM wong_access_members").all()).results).toEqual([]);
   expect((await runtime.env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'runtime_abort_save'").all()).results).toEqual([]);

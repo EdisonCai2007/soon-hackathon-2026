@@ -40,6 +40,12 @@ it('jumps to a source camera, a preset, and back to Room view, each time with a 
   expect(viewerReducer(initialViewer, { type: 'go', view: 'top' })).toBe(initialViewer)
 })
 
+it('goes back to a pose the page saved, and ignores one before the scan is in', () => {
+  const saved = poseFor(scene, 1)
+  expect(viewerReducer(ready, { type: 'look', pose: saved })).toEqual({ ...ready, pose: saved })
+  expect(viewerReducer(initialViewer, { type: 'look', pose: saved })).toBe(initialViewer)
+})
+
 it('stops on an error or a browser without 3D, and tries again from the start', () => {
   const failed = viewerReducer(ready, { type: 'error', message: 'The room didn’t load.' })
   expect(failed).toEqual({ status: 'error', message: 'The room didn’t load.' })

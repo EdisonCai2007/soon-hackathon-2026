@@ -12,6 +12,8 @@ export type ViewerEvent =
   | { type: 'error'; message: string }
   | { type: 'no-webgl' }
   | { type: 'go'; view: View }
+  // Back to a pose the page saved itself, as watching somebody up close does on the way out.
+  | { type: 'look'; pose: Pose }
   | { type: 'retry' }
 
 export const initialViewer: ViewerState = { status: 'loading', progress: null }
@@ -28,6 +30,8 @@ export function viewerReducer(state: ViewerState, event: ViewerEvent): ViewerSta
       const camera = typeof event.view === 'number' ? event.view : event.view === 'room' ? 0 : state.camera
       return { ...state, camera, pose: poseFor(state.scene, event.view) }
     }
+    case 'look':
+      return state.status === 'ready' ? { ...state, pose: event.pose } : state
     case 'error':
       return { status: 'error', message: event.message }
     case 'no-webgl':

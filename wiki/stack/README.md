@@ -23,6 +23,7 @@ The pack uses **merge = deploy**, independent staging and branch previews. [One 
 - [Company actions](company-api.md) — described app actions and memory reads for employee assistants, with separate authentication.
 - [The services list](service-catalogue.md) — where a chat starts for any outside service: the keys it can use, search, short answers, the shared error shape, and each service's notes page.
 - [Mini apps](mini-apps.md) — small apps from one request, part of the main app under `/apps/`: the same loop and checks as any change, and a card each on the home page.
+- [Live rooms in a mini app](live-rooms.md) — several people in one space at once: a Durable Object per room over hibernatable sockets, browser-to-browser media, and a class the test suite can open.
 - [Cloudflare Access](cloudflare-access.md) — automatic email login, native Worker and preview coverage, signed identity, and separate machine access.
 - [Employee access](employee-access.md) — the Access mini app: how the owner is known, the live app's key for its sign-in list, the first open, apps by a tick, and key levels.
 - [Access on previews](preview-access.md) — who signs in to previews, GitHub pushers included, the practice list, and the checker.

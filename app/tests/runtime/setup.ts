@@ -32,6 +32,9 @@ export async function startRuntime(vars: Record<string, string> = {}): Promise<R
     compatibility_flags: compatibility.compatibility_flags,
     send_metrics: false, vars, d1_databases: [{ binding: "DB", database_name: "runtime-test", database_id: "local-runtime-test",
       migrations_dir: resolve(app, "../schema/migrations") }],
+    // The ROAM app's live rooms, so a real room can be opened in a test.
+    durable_objects: { bindings: [{ name: "ROAM_ROOMS", class_name: "RoamRoom" }] },
+    exports: { RoamRoom: { type: "durable-object", storage: "sqlite" } },
     // No secret file or process environment value is a binding in this test configuration.
     secrets: { required: [] },
   };
