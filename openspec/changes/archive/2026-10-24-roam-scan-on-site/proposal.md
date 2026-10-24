@@ -1,6 +1,6 @@
 # Put the room scan on the site
 
-**Status:** planned
+**Status:** shipped
 **Branch:** roam-plans
 **Open questions:** none
 
@@ -59,3 +59,4 @@ None.
 - **2026-10-24** — Assumed: task 4.1 passes on CI, the gate, though `npm test` fails locally on Windows-only line-ending and path issues in untouched files.
 - **2026-10-24** — Assumed: task 4.3 passes on the preview (room renders; W, E, drag, Overview, Top view, Room view and camera 26s all move the camera). The look was judged by eye against the source, not side by side with Edison's viewer.
 - **2026-10-24** — Asked what should replace the WongStack name and logo in the top bar → chose "ROAM", on every page, with a plain R tab icon.
+- **2026-10-24** — Asked to publish step 1 → archived and published; the roadmap moved to its own branch, `roam-roadmap`.
