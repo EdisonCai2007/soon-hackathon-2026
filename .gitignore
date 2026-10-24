@@ -12,3 +12,7 @@ node_modules/
 
 # Agents' throwaway files.
 .scratch/
+
+# stale pre-move copies
+/roam-app/
+/work/
