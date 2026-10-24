@@ -1,6 +1,6 @@
 # Sharpen the scan: best upstairs, rebuilt stairs
 
-**Status:** in-progress
+**Status:** ready-to-ship
 **Branch:** roam-best-rooms
 **Open questions:** none
 
@@ -48,3 +48,4 @@ None: the scan is better, but what the site does is unchanged.
 - 2026-10-24: Joined the floors by a short fine-tune on both floors' training frames instead of deletion rules. Every rule scored worse somewhere: keeping upstairs splats fogged the stairs, and removing them cost the upstairs hall up to 4.7 dB. The fine-tune kept upstairs within 0.3 dB of its best and cleared the stairwell.
 - 2026-10-24: The downstairs hallway and lobby can't be compared on frames that neither split held out, because there are none. Each model scores 19.1–19.9 dB on its own held-out frames, so they count as unchanged.
 - 2026-10-24: Saved as its own version after Edison walked the local build; the branch carries only the splat scan, its pinned tests and the scan-builder scripts.
+- 2026-10-24: Archived for shipping; the walk ran on the local build, since this site has no preview deploy.
