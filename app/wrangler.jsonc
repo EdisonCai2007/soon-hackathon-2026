@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "soon-hackathon-2026",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-07-28",
+  // disallow_importable_env: code reaches a binding only through the env a
+  // route hands it, and a mini app's env leaves out the memory store, so it
+  // can not import it.
+  "compatibility_flags": ["nodejs_compat", "disallow_importable_env"],
+  // Signed Access identity is checked before every page, asset, API, and mini app.
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "vars": {
+    "WONG_ENVIRONMENT": "production",
+    "WORKSPACE_LOGIN": "off",
+    "WONG_OWNER_EMAIL": "",
+    "CF_ACCESS_TEAM_DOMAIN": "",
+    "CF_ACCESS_AUD": "",
+    "CF_ACCESS_APP_ID": "",
+    "CF_ACCESS_WORKER_ID": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "soon-hackathon-2026-db",
+      "database_id": "ec849016-fdcd-442a-9712-a7bcfbe17546",
+      "migrations_dir": "../schema/migrations"
+    },
+    // Session memory, production only. No migrations_dir: the memory skill migrates it.
+    {
+      "binding": "MEMORY_DB",
+      "database_name": "soon-hackathon-2026-memory",
+      "database_id": "b6f2cf3f-2c27-4fd8-9d92-af63f8fe7aa7"
+    }
+  ],
+  // Rereads who can push on GitHub, for previews' sign-in.
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "env": {
+    "staging": {
+      "name": "soon-hackathon-2026-staging",
+      "vars": {
+        "WONG_ENVIRONMENT": "staging",
+        "WORKSPACE_LOGIN": "off",
+        "WONG_OWNER_EMAIL": "",
+        "CF_ACCESS_TEAM_DOMAIN": "",
+        "CF_ACCESS_AUD": "",
+        "CF_ACCESS_APP_ID": "",
+        "CF_ACCESS_WORKER_ID": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "soon-hackathon-2026-db-staging",
+          "database_id": "528be452-1bfa-4070-a1cb-d00f35482497",
+          "migrations_dir": "../schema/migrations"
+        }
+      ],
+      "triggers": { "crons": [] }
+    },
+    "local": {
+      "name": "soon-hackathon-2026-local",
+      "vars": { "WONG_ENVIRONMENT": "local", "SKIP_AUTH": "true" },
+      "d1_databases": [{ "binding": "DB", "database_name": "soon-hackathon-2026-db-local", "database_id": "ec849016-fdcd-442a-9712-a7bcfbe17546", "remote": false, "migrations_dir": "../schema/migrations" }]
+    }
+  }
+}

@@ -25,7 +25,24 @@
       "memory",
       "wong-sync",
       "agent-browser"
-    ]
+    ],
+    "access": {
+      "mode": "open",
+      "reason": "zero-trust-onboarding",
+      "onboardingUrl": "https://one.dash.cloudflare.com/a329f3ce3c665e8d78cd49f96f007621/",
+      "ownerEmail": "xujohn01@gmail.com",
+      "humanLogin": "none"
+    },
+    "memory": {
+      "accountId": "a329f3ce3c665e8d78cd49f96f007621",
+      "databaseId": "b6f2cf3f-2c27-4fd8-9d92-af63f8fe7aa7",
+      "database": "soon-hackathon-2026-memory",
+      "bucket": null,
+      "worker": "https://soon-hackathon-2026.xujohn01.workers.dev/_memory"
+    },
+    "companyApi": {
+      "origin": "https://soon-hackathon-2026.xujohn01.workers.dev"
+    }
   },
   "installedAt": "2026-10-24"
 }
