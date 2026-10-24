@@ -15,6 +15,10 @@
 - [x] 3.4 Write `RoomViewer.tsx`. In an effect, create the renderer, Spark, and the `SplatMesh` from `room.spz`; apply the rotation; resize with the container; report load progress; dispose on unmount. Test it with `three` and Spark mocked.
 - [x] 3.5 Build `App.tsx`: the view buttons and camera select above the canvas, the key hint, the loading skeleton, and the error/no-WebGL card with *Try again*. Test each state and button.
 
+## 3b. Branding
+
+- [x] 3.6 Replace the WongStack name and W logo in the site's top bar, tab title, and tab icon with "ROAM"; update the tests that named the bar's link.
+
 ## 4. Verification
 
 - [x] 4.1 From `app/`, run the full suite (`npm test`), then `npm run test:checks`, since packages changed. All must be green. Log any loosened check as a `Check:` bullet in the Decision log.
