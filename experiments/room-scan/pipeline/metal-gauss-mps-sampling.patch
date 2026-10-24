@@ -1,0 +1,30 @@
+diff --git a/metal_gauss/mcmc.py b/metal_gauss/mcmc.py
+index 359fe78..3527edf 100644
+--- a/metal_gauss/mcmc.py
++++ b/metal_gauss/mcmc.py
+@@ -73,10 +73,10 @@ def relocate(params: dict, dead_thresh: float = 0.005,
+     w_alive = w[alive]
+     if not torch.isfinite(w_alive).all() or w_alive.sum() <= 0:
+         w_alive = opac[alive]          # fall back rather than sample from garbage
+-    pick = alive[torch.multinomial(w_alive, dead.numel(), replacement=True)]
++    pick = alive[torch.multinomial(w_alive.cpu(), dead.numel(), replacement=True).to(alive.device)]
+ 
+     # multiplicity N per target: 1 original + however many copies landed on it
+-    counts = torch.bincount(pick, minlength=n_act).clamp(1, MAX_MULTIPLICITY)
++    counts = torch.bincount(pick.cpu(), minlength=n_act).to(pick.device).clamp(1, MAX_MULTIPLICITY)
+     n_pick = counts[pick].to(opac.dtype)
+ 
+     o_src = opac[pick]
+@@ -139,10 +139,10 @@ def grow(params: dict, target: int, active: int, opt=None,
+     w = opac if weights is None else weights[:active].clamp_min(0)
+     if not torch.isfinite(w).all() or w.sum() <= 0:
+         w = opac
+-    pick = torch.multinomial(w.clamp_min(1e-8), add, replacement=True)
++    pick = torch.multinomial(w.clamp_min(1e-8).cpu(), add, replacement=True).to(w.device)
+     dst = torch.arange(active, target, device=pick.device)
+ 
+-    counts = torch.bincount(pick, minlength=active).clamp(1, MAX_MULTIPLICITY) + 1
++    counts = torch.bincount(pick.cpu(), minlength=active).to(pick.device).clamp(1, MAX_MULTIPLICITY) + 1
+     n_pick = counts[pick].to(opac.dtype)
+     o_new = 1.0 - (1.0 - opac[pick]).clamp_min(1e-6) ** (1.0 / n_pick)
+     logit_new = torch.log(o_new.clamp(1e-6, 1 - 1e-6) / (1.0 - o_new).clamp_min(1e-6))

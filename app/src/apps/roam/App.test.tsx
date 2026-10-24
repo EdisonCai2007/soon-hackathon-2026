@@ -70,9 +70,9 @@ it('opens at Room view with the scan’s counts, and each view or camera moves t
   await open()
   send({ type: 'ready', scene })
   expect(screen.queryByRole('status')).toBeNull()
-  expect(screen.getByText('22 video views · 173,224 splats')).toBeTruthy()
+  expect(screen.getByText('551 video views · 613,872 splats')).toBeTruthy()
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
-  expect(camera().options).toHaveLength(22)
+  expect(camera().options).toHaveLength(551)
   expect(camera().value).toBe('0')
 
   fireEvent.click(button('Overview'))
