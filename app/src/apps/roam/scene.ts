@@ -58,6 +58,12 @@ export function poseFor(scene: Scene, view: View): Pose {
   return { position: target.map((value, axis) => value + offset[axis]) as Vec3, target, up: [0, 1, 0], fov: FOV }
 }
 
+/** Where the camera stands right now, in the same shape a view jump uses, so it can be returned to. */
+export function cameraPose(camera: PerspectiveCamera): Pose {
+  const forward = camera.getWorldDirection(new Vector3()).add(camera.position)
+  return { position: camera.position.toArray(), target: forward.toArray(), up: camera.up.toArray(), fov: camera.fov }
+}
+
 export function applyPose(camera: PerspectiveCamera, { position, target, up, fov }: Pose) {
   camera.fov = fov
   camera.updateProjectionMatrix()

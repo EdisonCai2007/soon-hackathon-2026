@@ -4,10 +4,14 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { act, cleanup, render } from '@testing-library/react'
-import type { PerspectiveCamera } from 'three'
+import type { ComponentProps } from 'react'
+import { Mesh, Scene as World, Vector3, type PerspectiveCamera } from 'three'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { figureSize, floorHeight } from './placement'
+import { nextMotion, SEND_INTERVAL_MS } from './pose-feed'
+import type { Peer } from './presence'
 import { RoomViewer } from './RoomViewer'
-import { displayQuaternion, parseScene, poseFor } from './scene'
+import { cameraPose, displayQuaternion, parseScene, poseFor } from './scene'
 
 // The GPU parts are stood in: a renderer that draws nothing, and a splat mesh whose loading each test finishes.
 const fakes = vi.hoisted(() => ({
@@ -197,4 +201,85 @@ it('lets go of everything when it leaves the page, and reports nothing after', a
   expect(splats.dispose).toHaveBeenCalled()
   expect(fakes.sparks[2].dispose).toHaveBeenCalled()
   expect(renderer.domElement.isConnected).toBe(false)
+})
+
+const peer = (id: string, at: { x: number; y: number; z: number }): Peer =>
+  ({ member: { id, name: id, color: '#f97362', role: 'guest', pose: null }, motion: nextMotion(null, { ...at, yaw: 0 }, 0), stream: null })
+
+const live = async (props: Partial<ComponentProps<typeof RoomViewer>> = {}) => {
+  const onEvent = vi.fn()
+  const view = render(<RoomViewer sceneUrl="/apps/roam/scene.json" splatUrl="/apps/roam/room.spz" pose={null} onEvent={onEvent} {...props} />)
+  await settle()
+  fakes.splats[0].finish()
+  await settle()
+  const renderer = fakes.renderers[fakes.renderers.length - 1]
+  return { ...view, onEvent, renderer, draw: renderer.setAnimationLoop.mock.calls[0][0] as (time: number) => void }
+}
+
+it('draws the people in the room, follows them, and lets go of whoever leaves', async () => {
+  const props = { sceneUrl: '/apps/roam/scene.json', splatUrl: '/apps/roam/room.spz', pose: null }
+  const { rerender, draw, renderer, onEvent } = await live({ peers: [peer('a1', { x: 1, y: 0, z: 2 })] })
+  draw(0)
+  const world = renderer.render.mock.calls[0][0] as World
+  // The scan's own mesh plus one figure.
+  const figures = world.children.filter((child) => child instanceof Mesh)
+  expect(figures).toHaveLength(1)
+  expect(figures[0].position.x).toBe(1)
+
+  rerender(<RoomViewer {...props} onEvent={onEvent} peers={[]} />)
+  expect(world.children.filter((child) => child instanceof Mesh)).toHaveLength(0)
+})
+
+it('tells the page where this person stands, ten times a second and no more', async () => {
+  const onStance = vi.fn()
+  const { draw } = await live({ onStance })
+  draw(1000)
+  draw(1000 + SEND_INTERVAL_MS / 2)
+  draw(1000 + SEND_INTERVAL_MS)
+  expect(onStance).toHaveBeenCalledTimes(2)
+  expect(onStance.mock.calls[0][0]).toMatchObject({ x: expect.any(Number), yaw: expect.any(Number) })
+})
+
+it('watches the person a press lands on, and nobody where a press lands on the room', async () => {
+  const onPick = vi.fn()
+  const { draw, renderer } = await live({ peers: [peer('a1', { x: 0, y: 0, z: 0 })], onPick })
+  const canvas = renderer.domElement
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 400 }) as DOMRect
+  draw(0)
+  const viewing = renderer.render.mock.calls[0][1] as PerspectiveCamera
+  // Look at the figure from a few units away, so the middle of the view is on it.
+  const { height } = figureSize(scene)
+  viewing.position.set(0, floorHeight(scene) + height / 2, 3)
+  viewing.lookAt(new Vector3(0, floorHeight(scene) + height / 2, 0))
+  viewing.updateMatrixWorld()
+  draw(1)
+
+  canvas.dispatchEvent(new MouseEvent('click', { clientX: 400, clientY: 200 }))
+  expect(onPick).toHaveBeenCalledWith('a1', cameraPose(viewing))
+
+  onPick.mockClear()
+  canvas.dispatchEvent(new MouseEvent('click', { clientX: 10, clientY: 10 }))
+  expect(onPick).not.toHaveBeenCalled()
+})
+
+it('places the voices on the sound card the page hands it', async () => {
+  const createMediaStreamSource = vi.fn(() => ({ connect: (next: unknown) => next, disconnect: vi.fn() }))
+  const node = () => ({ connect: (next: unknown) => next, disconnect: vi.fn(), gain: { setTargetAtTime: vi.fn() } })
+  const audio = {
+    currentTime: 0, destination: {}, listener: { setPosition: vi.fn() },
+    createGain: vi.fn(node), createPanner: vi.fn(() => ({ ...node(), panningModel: '', distanceModel: '', rolloffFactor: 1 })),
+    createMediaStreamSource,
+  } as unknown as AudioContext
+  const stream = { getTracks: () => [] } as unknown as MediaStream
+  const { draw } = await live({ peers: [{ ...peer('a1', { x: 0, y: 0, z: 0 }), stream }], audio })
+  draw(0)
+  expect(createMediaStreamSource).toHaveBeenCalledWith(stream)
+  expect(audio.listener.setPosition).toHaveBeenCalled()
+})
+
+it('ignores a press on the room when the page is not listening for one', async () => {
+  const { renderer } = await live({ peers: [peer('a1', { x: 0, y: 0, z: 0 })] })
+  renderer.domElement.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 400 }) as DOMRect
+  // No onPick: the press is simply the one that takes the keyboard, as it was before rooms existed.
+  expect(() => renderer.domElement.dispatchEvent(new MouseEvent('click', { clientX: 400, clientY: 200 }))).not.toThrow()
 })

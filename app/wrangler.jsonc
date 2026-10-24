@@ -36,6 +36,14 @@
       "database_id": "b6f2cf3f-2c27-4fd8-9d92-af63f8fe7aa7"
     }
   ],
+  // One live ROAM room per link, named by its room id. Repeated per environment below: a Durable Object
+  // binding is not inherited, so each environment keeps its own rooms.
+  "durable_objects": {
+    "bindings": [{ "name": "ROAM_ROOMS", "class_name": "RoamRoom" }]
+  },
+  "exports": {
+    "RoamRoom": { "type": "durable-object", "storage": "sqlite" }
+  },
   // Rereads who can push on GitHub, for previews' sign-in.
   "triggers": { "crons": ["*/15 * * * *"] },
   "env": {
@@ -58,12 +66,18 @@
           "migrations_dir": "../schema/migrations"
         }
       ],
+      "durable_objects": {
+        "bindings": [{ "name": "ROAM_ROOMS", "class_name": "RoamRoom" }]
+      },
       "triggers": { "crons": [] }
     },
     "local": {
       "name": "soon-hackathon-2026-local",
       "vars": { "WONG_ENVIRONMENT": "local", "SKIP_AUTH": "true" },
-      "d1_databases": [{ "binding": "DB", "database_name": "soon-hackathon-2026-db-local", "database_id": "ec849016-fdcd-442a-9712-a7bcfbe17546", "remote": false, "migrations_dir": "../schema/migrations" }]
+      "d1_databases": [{ "binding": "DB", "database_name": "soon-hackathon-2026-db-local", "database_id": "ec849016-fdcd-442a-9712-a7bcfbe17546", "remote": false, "migrations_dir": "../schema/migrations" }],
+      "durable_objects": {
+        "bindings": [{ "name": "ROAM_ROOMS", "class_name": "RoamRoom" }]
+      }
     }
   }
 }

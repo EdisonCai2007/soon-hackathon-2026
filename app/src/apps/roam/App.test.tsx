@@ -33,16 +33,22 @@ afterEach(() => {
   viewer.mounts = 0
 })
 
-const open = async () => {
-  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+// Each app page loads on its own, so every test waits for the one its address asks for. The wait is
+// generous: the whole suite loads these pages at once, and a slow machine is not a broken page.
+const heading = (name: string) => () => screen.findByRole('heading', { name }, { timeout: 5000 })
+
+const open = async (at = '/apps/roam/', answers: Record<string, unknown> = {}, arrived = heading('ROAM')) => {
+  vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
     if (path === '/api/access/apps') return Response.json({ state: 'current', role: 'employee', revision: 1, apps: ['roam'] })
-    throw new Error(`Unexpected request: ${path}`)
+    if (path in answers) return Response.json(answers[path])
+    throw new Error(`Unexpected request: ${path} ${init?.method ?? 'GET'}`)
   }))
-  const router = createMemoryRouter(routes, { initialEntries: ['/apps/roam/'] })
+  const router = createMemoryRouter(routes, { initialEntries: [at] })
   await act(async () => {
     render(<RouterProvider router={router} />)
   })
-  await screen.findByRole('heading', { level: 1, name: 'ROAM' })
+  await arrived()
+  return router
 }
 const send = (event: Parameters<ComponentProps<typeof RoomViewer>['onEvent']>[0]) => act(() => viewer.props!.onEvent(event))
 const button = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement
@@ -99,4 +105,26 @@ it('gives a plain message on a browser without 3D', async () => {
   expect(screen.getByText(/This browser can’t show 3D/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   expect(screen.queryByTestId('viewer')).toBeNull()
+})
+
+it('walks the scan alone, with nobody in it and no room in the address', async () => {
+  await open()
+  send({ type: 'ready', scene })
+  expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onPick: undefined, onStance: undefined })
+  expect(screen.queryByText('sound off')).toBeNull()
+  expect(button('Start a room')).toBeTruthy()
+})
+
+it('starts a room and goes to its link', async () => {
+  const router = await open('/apps/roam/', { '/apps/roam/api/room': { roomId: '0123456789abcdef0123', hostKey: 'k1' } })
+  await act(async () => { fireEvent.click(button('Start a room')) })
+  expect(router.state.location.pathname).toBe('/apps/roam/r/0123456789abcdef0123')
+  expect(screen.getByRole('heading', { name: 'Join the room' })).toBeTruthy()
+})
+
+it("opens a shared link at the way in, and the camera link at the phone's screen", async () => {
+  await open('/apps/roam/r/0123456789abcdef0123', {}, heading('Join the room'))
+  cleanup()
+
+  await open('/apps/roam/phone/0123456789abcdef0123', { '/apps/roam/scene.json': scene }, heading('Be the camera'))
 })
