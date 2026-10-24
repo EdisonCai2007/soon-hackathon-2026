@@ -17,6 +17,6 @@
 
 ## 4. Verification
 
-- [ ] 4.1 From `app/`, run the full suite (`npm test`), then `npm run test:checks`, since packages changed. All must be green. Log any loosened check as a `Check:` bullet in the Decision log.
+- [x] 4.1 From `app/`, run the full suite (`npm test`), then `npm run test:checks`, since packages changed. All must be green. Log any loosened check as a `Check:` bullet in the Decision log.
 - [x] 4.2 Confirm every file under `app/public/apps/roam/` is under 25 MiB.
-- [ ] 4.3 `/save`, then preview from the agent host and open `/apps/roam/`. Check that the room renders, that W/A/S/D, Q/E and drag work, that each view button and a source camera move the camera, and that it looks the same as Edison's viewer at the same camera.
+- [x] 4.3 `/save`, then preview from the agent host and open `/apps/roam/`. Check that the room renders, that W/A/S/D, Q/E and drag work, that each view button and a source camera move the camera, and that it looks the same as Edison's viewer at the same camera.

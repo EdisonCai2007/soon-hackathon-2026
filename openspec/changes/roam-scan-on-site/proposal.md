@@ -56,3 +56,5 @@ None.
 - **2026-10-24** — Assumed: name this change `roam-scan-on-site`, and leave the full `roam-presence` plan in the other workspace as the roadmap for later changes.
 - **2026-10-24** — Asked to save the plans on a new branch → saved on `roam-plans`, plans only, no code.
 - **2026-10-24** — Asked how to fix Overview and Top view showing the ceiling (no cutaway) → chose to leave them as they are.
+- **2026-10-24** — Assumed: task 4.1 passes on CI, the gate, though `npm test` fails locally on Windows-only line-ending and path issues in untouched files.
+- **2026-10-24** — Assumed: task 4.3 passes on the preview (room renders; W, E, drag, Overview, Top view, Room view and camera 26s all move the camera). The look was judged by eye against the source, not side by side with Edison's viewer.
