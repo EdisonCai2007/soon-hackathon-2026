@@ -11,7 +11,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Review · roam-two-floor-scan</title>
+<title>Review · 2026-10-24-roam-two-floor-scan</title>
 <style>
   /* The app's look for pages outside the app: the plan review page, the private pages, and a closed link's page.
    look.mjs swaps the colour sets between the markers for the app's own, from app/src/index.css; this copy of
@@ -360,11 +360,11 @@
 })();
 </script>
 </head>
-<body data-change="roam-two-floor-scan">
+<body data-change="2026-10-24-roam-two-floor-scan">
 <main>
 <header>
   <p class="eyebrow">Review</p>
-  <h1>roam-two-floor-scan</h1>
+  <h1>2026-10-24-roam-two-floor-scan</h1>
   <p class="muted"><span class="note-count">0 notes</span></p>
   <nav aria-label="Sections"><ul class="jump"><li><a href="#why">Why</a></li><li><a href="#changes">Changes</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#notes">Notes</a></li></ul></nav>
   <p class="hint">Tap + Note to comment. <span class="copies">Saving a note copies all your notes.</span> Open a drawing and tap it to see it full screen.</p>
@@ -395,6 +395,7 @@
 <li class="decision card" id="decision-1" data-note="decision-1" tabindex="0"><p class="meta"><span class="tag log">log</span></p>2026-10-24: Saved as a new branch from <code>main</code> instead of the open upstairs pull request, which conflicts with the live room. This change carries the two-floor scan, superseding that one's single-floor scan; the old version stays in git history.</li>
 <li class="decision card" id="decision-2" data-note="decision-2" tabindex="0"><p class="meta"><span class="tag log">log</span></p>2026-10-24: Trained the new floor on its own and joined it, instead of retraining both floors, so the upstairs splats stay exactly as they were. Above the upstairs floor plane the old scan wins; below it the new one; at the top of the stairs only the new scan stays, because the old one filled the stairwell with haze.</li>
 <li class="decision card" id="decision-3" data-note="decision-3" tabindex="0"><p class="meta"><span class="tag log">log</span></p>2026-10-24: The live room took its floor and figure scale from the scan's lowest point. With two floors that is the downstairs floor, so the description now lists <code>floors</code> and placement uses the highest floor at or below a height. Optional, so a one-floor scan reads as before.</li>
+<li class="decision card" id="decision-4" data-note="decision-4" tabindex="0"><p class="meta"><span class="tag log">log</span></p>2026-10-24: Archived for shipping. The walk ran on a local build of the same files, since this site has no preview deploy.</li>
 </ol>
 </section>
 <section id="notes" aria-labelledby="notes-h"><h2 id="notes-h">Your notes</h2>

@@ -1,6 +1,6 @@
 # Add the first floor to the room scan
 
-**Status:** in-progress
+**Status:** ready-to-ship
 **Branch:** roam-two-floor-scan
 **Open questions:** none
 
@@ -47,3 +47,4 @@ None.
 - 2026-10-24: Saved as a new branch from `main` instead of the open upstairs pull request, which conflicts with the live room. This change carries the two-floor scan, superseding that one's single-floor scan; the old version stays in git history.
 - 2026-10-24: Trained the new floor on its own and joined it, instead of retraining both floors, so the upstairs splats stay exactly as they were. Above the upstairs floor plane the old scan wins; below it the new one; at the top of the stairs only the new scan stays, because the old one filled the stairwell with haze.
 - 2026-10-24: The live room took its floor and figure scale from the scan's lowest point. With two floors that is the downstairs floor, so the description now lists `floors` and placement uses the highest floor at or below a height. Optional, so a one-floor scan reads as before.
+- 2026-10-24: Archived for shipping. The walk ran on a local build of the same files, since this site has no preview deploy.

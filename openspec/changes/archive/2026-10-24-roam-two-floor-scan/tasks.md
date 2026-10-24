@@ -11,4 +11,4 @@
 
 ## 2. Verification
 
-- [ ] 2.1 `/save`, then walk the preview at `/apps/roam/`: the scan opens upstairs, and the stairs, hallway and lobby cameras reach the floor below.
+- [x] 2.1 `/save` passes its checks, and a walk of `/apps/roam/` (local build; this site has no preview deploy) opens upstairs, and the stairs, hallway and lobby cameras reach the floor below.
