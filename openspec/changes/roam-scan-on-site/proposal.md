@@ -55,3 +55,4 @@ None.
 - **2026-10-24** — Assumed: leave out the ceiling cutaway and the point-cloud comparison, because the demo needs neither, and each adds code the site's every-line-tested rule must cover.
 - **2026-10-24** — Assumed: name this change `roam-scan-on-site`, and leave the full `roam-presence` plan in the other workspace as the roadmap for later changes.
 - **2026-10-24** — Asked to save the plans on a new branch → saved on `roam-plans`, plans only, no code.
+- **2026-10-24** — Asked how to fix Overview and Top view showing the ceiling (no cutaway) → chose to leave them as they are.
