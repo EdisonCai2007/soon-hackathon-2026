@@ -48,3 +48,5 @@ Adds `experiments/room-scan/` only, plus this change record. The existing applic
 - **2026-10-24** — Check: `experiments/room-scan/vendor/three.module.js` retains upstream lint-disable comments for the same unmodified vendor distribution, rather than editing third-party code to satisfy a text scan.
 
 - **2026-10-24** — Assumed: readiness is supported by all six POV tests, successful portable preparation/export against the original scan, Python compilation, strict OpenSpec validation, browser POV checks, and `LOCAL_CHECKS=pass`. Review found and reproduced a custom-timestamp filename error; indexed filenames resolve it.
+
+- **2026-10-24** — Asked: opened [draft PR #1](https://github.com/EdisonCai2007/soon-hackathon-2026/pull/1) targeting `main`, as requested. The branch is pushed; GitHub checks are running. No merge was performed.

@@ -14,4 +14,4 @@
 ## 3. Review and draft delivery
 
 - [x] 3.1 Run the repository pre-check and record its result; validate this change with OpenSpec and generate its review page.
-- [ ] 3.2 Commit and push the named feature branch; create and verify a draft PR targeting main without merging it.
+- [x] 3.2 Commit and push the named feature branch; create and verify a draft PR targeting main without merging it.
