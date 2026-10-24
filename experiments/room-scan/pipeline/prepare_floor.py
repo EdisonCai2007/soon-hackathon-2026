@@ -12,6 +12,7 @@ parser.add_argument('--people',type=Path,required=True,help='detect_people.py ou
 parser.add_argument('--metadata',type=Path,required=True,help='The existing scan\'s splat_dataset/metadata.json.')
 parser.add_argument('--max-people',type=float,default=.3,help='Skip a frame when people cover more of it than this.')
 parser.add_argument('--seeds',type=int,default=250000)
+parser.add_argument('--width',type=int,default=672,help='Training image width; 1344 trains sharper from 1080p video, at four times the cost per step.')
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
 OUT=args.output.resolve();sparse=OUT/'splat_dataset/sparse/0';images=OUT/'splat_dataset/images';review=OUT/'masks'
@@ -40,14 +41,16 @@ for v in np.unique(src):
     fy,cy=np.linalg.lstsq(np.stack([ray[...,1][m],np.ones(m.sum())],-1),Y,rcond=None)[0]
     assert fx>0 and fy>0;lens[v]=(fx,fy,cx,cy);print(f'{names[v]} lens',np.round(lens[v],1),flush=True)
 
+IW=args.width;IH=round(args.width*392/672)
 caps={v:cv2.VideoCapture(str(p)) for v,p in paths.items()};cams=[];ims=[];kept=[]
 for i in np.flatnonzero(use):
     cap=caps[src[i]];cap.set(cv2.CAP_PROP_POS_MSEC,float(times[i])*1000);ok,bgr=cap.read();assert ok
-    frame=cv2.resize(bgr,(672,392),interpolation=cv2.INTER_AREA);n=len(kept)+1;name=f'{n-1:03d}.png'
-    cv2.imwrite(str(images/name),np.dstack([frame,(~people[i]).astype(np.uint8)*255]))
-    tint=frame.copy();tint[people[i]]=tint[people[i]]//2+[0,0,127];cv2.imwrite(str(review/f'{n-1:03d}.jpg'),tint)
-    fx,fy,cx,cy=lens[src[i]];sx=672/W;sy=392/H
-    cams.append(f'{n} PINHOLE 672 392 {fx*sx} {fy*sy} {(cx+.5)*sx-.5} {(cy+.5)*sy-.5}\n')
+    frame=cv2.resize(bgr,(IW,IH),interpolation=cv2.INTER_AREA);n=len(kept)+1;name=f'{n-1:03d}.png'
+    person=cv2.resize(people[i].astype(np.uint8),(IW,IH),interpolation=cv2.INTER_NEAREST)>0
+    cv2.imwrite(str(images/name),np.dstack([frame,(~person).astype(np.uint8)*255]))
+    tint=frame.copy();tint[person]=tint[person]//2+[0,0,127];cv2.imwrite(str(review/f'{n-1:03d}.jpg'),tint)
+    fx,fy,cx,cy=lens[src[i]];sx=IW/W;sy=IH/H
+    cams.append(f'{n} PINHOLE {IW} {IH} {fx*sx} {fy*sy} {(cx+.5)*sx-.5} {(cy+.5)*sy-.5}\n')
     vm=np.linalg.inv(poses[i]);q=Rotation.from_matrix(vm[:3,:3]).as_quat()[[3,0,1,2]]
     ims.append(f'{n} '+' '.join(map(str,[*q,*vm[:3,3]]))+f' {n} {name}\n\n');kept.append(i)
 (sparse/'cameras.txt').write_text(''.join(cams));(sparse/'images.txt').write_text(''.join(ims))

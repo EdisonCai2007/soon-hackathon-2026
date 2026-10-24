@@ -79,7 +79,14 @@ A new floor trains on its own and joins the existing splats, so the scanned floo
 3. **Stitch:** `extend_scan.py --plan plan.json` fits each piece to its parent through the shared frames and appends the new frames to the existing `reconstruction.npz`. Each owner names a video by file name.
 4. **Mask people:** `detect_people.py` caches a dilated Mask R-CNN mask per frame; it also catches people in mirrors.
 5. **Train:** `prepare_floor.py --chunk <pieces>` writes the dataset with people as transparent pixels, then train as above.
-6. **Clean:** `drop_people.py` deletes splats the training views mostly see inside a person mask, such as someone sitting still. `see_through.py` deletes splats newer footage sees straight past: run it on the old scan with the stairs video, and on the new floor with the old hall video.
-7. **Join:** `merge_floor.py --upper-floor a,b,c --prefer-floor x,z,r` keeps the old scan above its floor plane and the new floor below it; inside the circle at the top of the stairs only the new floor stays, because the old scan filled the stairwell with haze it glimpsed from above. Then `export_splats.py --workdir <merge output> --source <merge output>/room_merged.ply`, then `app/scripts/roam-ply-to-spz.mjs`.
+6. **Clean:** `drop_people.py` deletes splats the training views mostly see inside a person mask, such as someone sitting still.
+7. **Join:** `merge_floor.py --upper-floor a,b,c` keeps the old scan above its floor plane and the new floor below it.
+8. **Fine-tune both floors together:** `combine_datasets.py` joins both training sets, leaving out the frames each held out; `finetune.py --init <joined PLY>` then runs the trainer from the joined splats (5,000 steps, `--lr-means 5e-5 --sh-warmup 0 --num-downscales 0`). This clears the haze where the two scans overlap, such as the stairwell, which no rule could: it let both floors' views decide. Run `drop_people.py --share 0.25 --min-views 2` once more, then `export_splats.py --floors <heights>` and `app/scripts/roam-ply-to-spz.mjs`.
+
+## Score before you splice
+
+`score_rooms.py` renders each model at the frames training held out and reports PSNR per room against the real video, people ignored. Score every candidate before swapping a room for another version: here the raw 307-view upstairs model beat every cleaned and spliced version in every room. The door cut cost little, but ghost cleanups dropped the hallway from 25.1 to 19.7 dB, and splicing back the original bedroom scan cost the bedroom 4 dB and the hallway another 3. Rules that delete splats near a seam (`see_through.py`, a floor-only circle at the stairs) also scored worse than the joint fine-tune.
+
+More views beat more cleanup: re-running the stairs at one frame every 0.3 s (210 frames in three Pi3X runs, stitched to the first stairs run through about 15 shared frames each) raised the stairs from 17–21 dB to 22.5–23 dB.
 
 `fit_path.py` (fitting pieces to a hand-drawn floor map) and `remove_people.py` were tried and not used: a sketched map's proportions bent the hallway, and painting before training removed people better than deleting splats after.
