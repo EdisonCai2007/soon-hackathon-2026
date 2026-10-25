@@ -15,7 +15,7 @@ The phone page SHALL stream its camera into the room and SHALL take its position
 - **THEN** the page says so plainly and offers to join as an ordinary guest instead
 
 ### Requirement: Lining up once ties the phone to the scan
-The phone page SHALL line the phone's tracking up with the scan from a known spot in the real home, confirmed by the person, and SHALL refuse to place them until that is done. Several marked spots SHALL be offered, each a place the scan already knows, so the person picks the one they are standing on; a spot SHALL settle which floor they are on as well as where. The person SHALL be able to line up again at any of those spots while they walk, so tracking that has drifted is corrected without starting over.
+The phone page SHALL line the phone's tracking up with the scan from a known spot in the real home, confirmed by the person, and SHALL refuse to place them until that is done. Several marked spots SHALL be offered, each a place the scan already knows, so the person picks the one they are standing on; a spot SHALL settle which floor they are on as well as where. The person SHALL be able to line up again at any of those spots while they walk, so tracking that has drifted is corrected without starting over. Where the phone draws the scan over the real room, lining up again SHALL move the drawn scan to the newly picked spot as well as the person's place in it.
 
 #### Scenario: Stand on a spot
 - **WHEN** the person stands on one of the marked spots facing the marked direction and picks it
@@ -23,7 +23,7 @@ The phone page SHALL line the phone's tracking up with the scan from a known spo
 
 #### Scenario: Lining up again after a walk
 - **WHEN** the person has walked far enough that their place in the scan has drifted, and they stand on another marked spot and pick it
-- **THEN** their position locks to that spot, and what they do next is placed from there instead of from the spot they started at
+- **THEN** their position locks to that spot, the drawn scan is placed against it, and what they do next is placed from there instead of from the spot they started at
 
 #### Scenario: Not lined up yet
 - **WHEN** the person tries to be placed in the scan before picking a spot
