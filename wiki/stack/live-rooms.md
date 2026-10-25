@@ -54,4 +54,4 @@ Cloudflare [does not generate a Version URL for a Worker that implements a Durab
 - **A remote stream needs an element.** Chrome will not let Web Audio pull from a remote `MediaStream` until a hidden, muted `<audio>` element in the page is playing it.
 - **Sound waits for a gesture.** The `AudioContext` starts suspended; resume it on the first press and say *sound off* until it runs.
 
-Part of [the Cloudflare stack](README.md). For a person physically in the room, see [AR in the browser](../development/ar-in-the-browser.md); for what people leave in the same space and find again later, see [a lasting place](places-and-notes.md).
+Part of [the Cloudflare stack](README.md). For a person physically in the room, see [AR in the browser](../development/ar-in-the-browser.md); for what people leave in the same space and find again later, see [a lasting place](places-and-notes.md); for the hand signs people make inside a room, see [hands read in the browser](hand-signs.md).

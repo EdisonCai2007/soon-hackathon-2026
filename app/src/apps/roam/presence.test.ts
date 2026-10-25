@@ -57,6 +57,14 @@ it('holds a person video once it arrives, and ignores one for a stranger', () =>
   expect(presenceReducer(joined, { type: 'stream', id: 'nobody', stream }).peers[0].stream).toBeNull()
 })
 
+it('holds what somebody cast, and ignores a cast from a stranger', () => {
+  const joined = heard(live(), { type: 'joined', member: member('a1', 'Alex') })
+  expect(joined.peers[0].cast).toBeNull()
+  const cast = heard(joined, { type: 'cast', id: 'a1', technique: 'domain' }, 2000)
+  expect(cast.peers[0].cast).toEqual({ technique: 'domain', at: 2000 })
+  expect(heard(cast, { type: 'cast', id: 'nobody', technique: 'blue' }).peers[0].cast).toEqual({ technique: 'domain', at: 2000 })
+})
+
 it('says when the room was full and when this person was removed', () => {
   const joined = heard(live(), { type: 'joined', member: member('a1', 'Alex') })
   expect(heard(joined, { type: 'closed', reason: 'full' })).toMatchObject({ status: 'full', peers: [] })

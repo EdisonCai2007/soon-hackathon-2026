@@ -204,7 +204,7 @@ it('lets go of everything when it leaves the page, and reports nothing after', a
 })
 
 const peer = (id: string, at: { x: number; y: number; z: number }): Peer =>
-  ({ member: { id, name: id, color: '#f97362', role: 'guest', pose: null }, motion: nextMotion(null, { ...at, yaw: 0 }, 0), stream: null })
+  ({ member: { id, name: id, color: '#f97362', role: 'guest', pose: null }, motion: nextMotion(null, { ...at, yaw: 0 }, 0), stream: null, cast: null })
 
 const live = async (props: Partial<ComponentProps<typeof RoomViewer>> = {}) => {
   const onEvent = vi.fn()

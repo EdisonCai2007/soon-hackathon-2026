@@ -12,3 +12,6 @@ node_modules/
 
 # Agents' throwaway files.
 .scratch/
+
+# The hand reader's WebAssembly, copied from the pinned package at build time: over 12 MB a file.
+app/public/apps/roam/hands/wasm/

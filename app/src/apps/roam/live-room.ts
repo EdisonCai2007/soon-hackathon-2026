@@ -6,6 +6,7 @@ import { openMesh, type PeerMesh } from './peer-media'
 import { initialPresence, peerIds, presenceReducer, type PresenceState } from './presence'
 import { dueToSend } from './pose-feed'
 import { openRoom, socketUrl, type RoomSocket } from './room-socket'
+import type { TechniqueName } from './techniques'
 
 export type Role = 'guest' | 'camera'
 export type LiveRoom = PresenceState & {
@@ -14,6 +15,9 @@ export type LiveRoom = PresenceState & {
   unlock: () => void
   tell: (pose: Pose) => void
   remove: (id: string) => void
+  /** This page's own camera, already open for its figure, so the hand reader needs no second one. */
+  local: MediaStream | null
+  cast: (technique: TechniqueName) => void
   failure: string | null
 }
 
@@ -36,6 +40,7 @@ export function useLiveRoom(app: string, roomId: string, name: string, role: Rol
   const [state, dispatch] = useReducer(presenceReducer, initialPresence)
   const [failure, setFailure] = useState<string | null>(null)
   const [sound, setSound] = useState<'blocked' | 'running'>('blocked')
+  const [camera, setCamera] = useState<MediaStream | null>(null)
   const audio = useMemo(() => (typeof AudioContext === 'undefined' ? null : new AudioContext()), [])
   const room = useRef<RoomSocket | null>(null)
   const mesh = useRef<PeerMesh | null>(null)
@@ -52,6 +57,7 @@ export function useLiveRoom(app: string, roomId: string, name: string, role: Rol
         for (const track of local.getTracks()) track.stop()
         return
       }
+      setCamera(local)
       const socket = openRoom(socketUrl(location.origin, app, roomId, name, role), {
         onMessage: (message) => {
           if (message.type === 'welcome') mesh.current = openMesh(local, message.self.id, {
@@ -71,6 +77,7 @@ export function useLiveRoom(app: string, roomId: string, name: string, role: Rol
       mesh.current = null
       room.current?.close()
       room.current = null
+      setCamera(null)
     }
   }, [app, roomId, name, role])
 
@@ -85,6 +92,8 @@ export function useLiveRoom(app: string, roomId: string, name: string, role: Rol
     room.current?.send({ type: 'pose', pose })
   }, [])
 
+  const cast = useCallback((technique: TechniqueName) => room.current?.send({ type: 'cast', technique }), [])
+
   const remove = useCallback((id: string) => {
     const key = hostKeyFor(roomId)
     if (key) room.current?.send({ type: 'remove', id, key })
@@ -98,5 +107,5 @@ export function useLiveRoom(app: string, roomId: string, name: string, role: Rol
 
   useEffect(() => () => { void audio?.close().catch(() => {}) }, [audio])
 
-  return { ...state, audio, soundBlocked: sound === 'blocked', unlock, tell, remove, failure }
+  return { ...state, audio, soundBlocked: sound === 'blocked', unlock, tell, remove, local: camera, cast, failure }
 }

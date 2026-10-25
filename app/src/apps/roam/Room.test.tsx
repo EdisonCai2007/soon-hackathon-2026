@@ -8,6 +8,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { LiveRoom } from './live-room'
 import type { Member } from './messages'
+import { nextMotion } from './pose-feed'
 import type { Peer } from './presence'
 import { Room } from './Room'
 import type { RoomViewer } from './RoomViewer'
@@ -33,11 +34,12 @@ vi.mock('./live-room', () => ({
 
 const member = (id: string, name: string): Member => ({ id, name, color: '#4fb8ff', role: 'guest', pose: null })
 const peer = (id: string, name: string, stream: MediaStream | null = null): Peer =>
-  ({ member: member(id, name), motion: null, stream })
+  ({ member: member(id, name), motion: null, stream, cast: null })
 
 const live = (over: Partial<LiveRoom> = {}): LiveRoom => ({
   status: 'live', self: member('me', 'Me'), peers: [], capacity: 6, audio: null, soundBlocked: true,
-  unlock: () => { fakes.unlocks += 1 }, tell: () => {}, remove: (id) => fakes.removed.push(id), failure: null, ...over,
+  unlock: () => { fakes.unlocks += 1 }, tell: () => {}, remove: (id) => fakes.removed.push(id),
+  local: null, cast: () => {}, failure: null, ...over,
 })
 
 afterEach(() => {
@@ -84,6 +86,27 @@ it('says sound is off until the first press on the page starts it', async () => 
   cleanup()
   await open({ soundBlocked: false })
   expect(screen.queryByText('sound off')).toBeNull()
+})
+
+it('keeps hands off until it is asked, and says so when they can not be read', async () => {
+  await open()
+  expect(screen.queryByText('hands on')).toBeNull()
+  // With no camera behind the page there is nothing to read, and the bar says so rather than failing quietly.
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Hands on' })) })
+  expect(screen.getByText('This browser can’t read your hands.')).toBeTruthy()
+})
+
+it('draws a cast where the person who made it is standing', async () => {
+  const motion = nextMotion(null, { x: 1, y: -3.9, z: 2, yaw: 0 }, 1000)
+  const casting = { ...peer('a1', 'Alex'), motion, cast: { technique: 'purple' as const, at: 500 } }
+  const sent: unknown[] = []
+  await open({ peers: [casting], tell: (stance) => sent.push(stance) })
+  await ready()
+  expect(viewer.props!.casts).toEqual([{ id: 'a1', technique: 'purple', at: 500, where: { x: 1, y: -3.9, z: 2, yaw: 0 } }])
+  // Where this page stands goes to the room and is kept, so its own cast has somewhere to be drawn.
+  const here = { x: 0, y: -3.9, z: 0, yaw: 1 }
+  await act(async () => { viewer.props!.onStance!(here) })
+  expect(sent).toEqual([here])
 })
 
 it('watches a person up close and comes back to the same spot', async () => {

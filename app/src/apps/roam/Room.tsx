@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useCasting } from './casting'
 import { RoomPeople } from './Host'
 import { cameraLink } from './invite'
 import { Join } from './Join'
@@ -24,12 +25,14 @@ function Stopped({ message }: { message: string }) {
 /** Inside a room: everyone is drawn in the scan, heard from where they stand, and listed beside it. */
 function Live({ app, roomId, name }: { app: string; roomId: string; name: string }) {
   const room = useLiveRoom(app, roomId, name, 'guest')
+  // The camera the room already opened for this person's figure is the one their hands are read from.
+  const casting = useCasting(room.local, room.cast)
   const host = hostKeyFor(roomId) !== null
   const stopped = STOPPED[room.status]
   if (room.failure) return <Stopped message={room.failure} />
   if (stopped) return <Stopped message={stopped} />
   return <Scan app={app} live={{
-    peers: room.peers, audio: room.audio, soundBlocked: room.soundBlocked, unlock: room.unlock, tell: room.tell,
+    peers: room.peers, audio: room.audio, soundBlocked: room.soundBlocked, unlock: room.unlock, tell: room.tell, casting,
     people: <RoomPeople app={app} roomId={roomId} peers={room.peers} host={host} onRemove={room.remove} />,
   }} />
 }

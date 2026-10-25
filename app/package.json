@@ -10,6 +10,9 @@
     "dev": "CLOUDFLARE_ENV=local vite",
     "build": "bash ../scripts/cf-build.sh",
     "build:app": "tsc -b && vite build",
+    "vendor:hands": "node scripts/roam-vendor-hands.mjs",
+    "predev": "npm run vendor:hands",
+    "prebuild:app": "npm run vendor:hands",
     "db:migrate:staging": "wrangler d1 migrations apply soon-hackathon-2026-db-staging --remote --env staging",
     "db:migrate:prod": "wrangler d1 migrations apply soon-hackathon-2026-db --remote",
     "db:reset:staging": "node ../scripts/reset-staging-d1.mjs",
@@ -24,6 +27,7 @@
     "test:runtime": "vitest run --config vitest.config.runtime.ts"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.1",
     "@sparkjsdev/spark": "~2.4.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

@@ -134,6 +134,16 @@ it('tells the room where this person stands, ten times a second', async () => {
   now.mockRestore()
 })
 
+it('hands the page its own camera and sends what it cast', async () => {
+  browser()
+  const view = await join()
+  await act(async () => { FakeSocket.last!.hear({ type: 'welcome', self: member('me'), members: [], capacity: 6 }) })
+  // The camera opened for this person's figure is the one their hands are read from.
+  expect(view.result.current.local).not.toBeNull()
+  act(() => view.result.current.cast('purple'))
+  expect(FakeSocket.last!.sent.at(-1)).toEqual({ type: 'cast', technique: 'purple' })
+})
+
 it("removes somebody only with the host's own key", async () => {
   browser()
   const view = await join('room-2')
