@@ -23,3 +23,6 @@ const linkTo = (origin: string, app: string, prefix: string, roomId: string) => 
 /** The link the host shares, and the one a phone in the room opens. */
 export const inviteLink = (origin: string, app: string, roomId: string): string => linkTo(origin, app, 'r', roomId)
 export const cameraLink = (origin: string, app: string, roomId: string): string => linkTo(origin, app, 'phone', roomId)
+
+/** The tools for placing things in the scan show only at an address ending `?tools`; everyone else sees the room. */
+export const toolsOn = () => new URLSearchParams(location.search).has('tools')

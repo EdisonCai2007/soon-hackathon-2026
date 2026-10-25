@@ -76,6 +76,6 @@ export function Phone({ app, roomId }: { app: string; roomId: string }) {
           {lost && <p className="rounded-3xl border-2 border-roam-red px-4 py-3 font-semibold">Hold still for a moment: the phone has lost track of the room.</p>}
           <Pill type="button" onClick={() => { session.current?.stop(); setStep('ready') }}>Stop</Pill>
         </>}
-      {room.failure && <p className="rounded-full border-2 border-roam-peri px-3.5 py-1 text-sm font-medium">{room.failure}</p>}
+      {room.failure && <p className="rounded-full border-2 border-roam-red px-3.5 py-1 text-sm font-medium">{room.failure}</p>}
   </Centered>
 }

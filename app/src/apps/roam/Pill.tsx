@@ -17,7 +17,7 @@ function Neck({ size, look }: { size: Size; look: Look }) {
   return <span aria-hidden="true" className="relative z-10 shrink-0 self-stretch" style={{ width: gap }}>
     <svg className="absolute top-0 overflow-visible" style={{ left: -height / 2 }} width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       <path d={fill} className={look === 'loud' ? 'fill-roam-peri' : 'fill-roam-cream'} />
-      <path d={edge} className="fill-none stroke-roam-peri" strokeWidth={STROKE} />
+      <path d={edge} className={cn('fill-none', look === 'loud' ? 'stroke-roam-peri' : 'stroke-roam-red')} strokeWidth={STROKE} />
     </svg>
   </span>
 }

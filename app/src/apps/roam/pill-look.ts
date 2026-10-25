@@ -1,29 +1,37 @@
 import { cn } from '@/lib/utils'
 
-// The visuals board's buttons: a rounded pill with a periwinkle edge, and pills joined by a pinched neck.
+// The visuals board's buttons: a rounded pill with a red edge, and pills joined by a pinched neck.
 export type Size = 'big' | 'small' | 'chip'
-export const HEIGHT: Record<Size, number> = { big: 48, small: 36, chip: 32 }
+export const HEIGHT: Record<Size, number> = { big: 40, small: 32, chip: 32 }
 export const STROKE = 2
 export const gapFor = (height: number) => Math.round(height * 0.19)
 
 const LOOK = {
-  quiet: 'bg-roam-cream text-roam-peri hover:bg-roam-mist hover:text-roam-peri',
-  loud: 'bg-roam-peri text-roam-cream hover:bg-roam-peri/90 hover:text-roam-cream',
+  quiet: 'bg-roam-cream text-roam-red',
+  // A loud pill's edge is its fill, so it reads as one blue shape, not a blue pill ringed in red.
+  loud: 'border-roam-peri bg-roam-peri text-roam-cream',
 }
 export type Look = keyof typeof LOOK
+// Pressable sizes fill blue with white text under the pointer; a loud pill, blue already, deepens to ink.
+// A chip is only read, so it keeps its look and the plain cursor.
+const PRESS: Record<Look, string> = {
+  quiet: 'cursor-pointer hover:bg-roam-peri hover:text-white',
+  loud: 'cursor-pointer hover:border-roam-ink hover:bg-roam-ink hover:text-white',
+}
+const look = (which: Look, size: Size) => cn(LOOK[which], size !== 'chip' && PRESS[which])
 const SIZE: Record<Size, string> = {
-  big: 'h-12 px-6 text-2xl',
-  small: 'h-9 px-4 text-lg',
+  big: 'h-10 px-5 text-xl',
+  small: 'h-8 px-3.5 text-base',
   chip: 'h-8 px-3.5 text-[15px]',
 }
-const EDGE = 'rounded-full border-2 border-roam-peri font-roam-label font-normal lowercase tracking-[-0.07em] shadow-none'
+const EDGE = 'rounded-full border-2 border-roam-red font-roam-label font-normal lowercase tracking-[-0.07em] shadow-none'
 
 /** The pill a ROAM control is drawn as, on any element. */
-export const pill = (look: Look = 'quiet', size: Size = 'big') => cn(EDGE, LOOK[look], SIZE[size])
+export const pill = (which: Look = 'quiet', size: Size = 'big') => cn(EDGE, look(which, size), SIZE[size])
 
 /** A round pill holding one icon, the size of a pill of the same size. */
-export const bubble = (look: Look = 'quiet', size: Size = 'big') =>
-  cn(EDGE, LOOK[look], 'inline-grid shrink-0 place-items-center p-0', { big: 'size-12', small: 'size-9', chip: 'size-8' }[size])
+export const bubble = (which: Look = 'quiet', size: Size = 'big') =>
+  cn(EDGE, look(which, size), 'inline-grid shrink-0 place-items-center p-0', { big: 'size-10', small: 'size-8', chip: 'size-8' }[size])
 
 const r2 = (value: number) => Math.round(value * 100) / 100
 const point = ([x, y]: number[]) => `${r2(x)} ${r2(y)}`

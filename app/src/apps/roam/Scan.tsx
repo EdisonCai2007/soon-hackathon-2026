@@ -1,16 +1,16 @@
-import { Expand, MapPin, Video, VolumeX } from 'lucide-react'
-import { useReducer, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Expand, VolumeX } from 'lucide-react'
+import { useReducer, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 import type { Pose as Stance } from './messages'
-import { Chip, Joined, Pill } from './Pill'
-import { bubble, pill } from './pill-look'
+import { Joined, Pill } from './Pill'
+import { bubble } from './pill-look'
 import type { Peer } from './presence'
 import { RoomViewer } from './RoomViewer'
 import type { Pose, View } from './scene'
 import { card, Halftone, Screen, title } from './Screen'
+import { toolsOn } from './invite'
+import { Counts, Placing } from './Tools'
 import { initialViewer, viewerReducer, type ViewerEvent, type ViewerState } from './viewer-state'
 import { Watch } from './Watch'
 import { Wordmark } from './Wordmark'
@@ -61,70 +61,47 @@ const fill = (box: HTMLElement | null) => {
 type Ready = Extract<ViewerState, { status: 'ready' }> | null
 type Act = (event: ViewerEvent) => void
 
-/** The top of the room: the name and counts at the left, the views in the middle, full screen at the right. */
-function Bar({ ready, live, act, box }: { ready: Ready; live?: Live; act: Act; box: HTMLElement | null }) {
+// The middle of the bar fills red under the pointer, where the other pills fill blue.
+const MAIN = 'hover:bg-roam-red hover:text-white'
+
+/** Who is in the room, folded under one pill beside the views until it is opened. */
+function WhosIn({ live }: { live: Live }) {
+  const [open, setOpen] = useState(false)
+  return <div className="relative">
+    <Pill type="button" className={MAIN} aria-expanded={open} aria-controls="roam-whos-in" onClick={() => setOpen(!open)}>
+      who’s in · {live.peers.length + 1}
+      <ChevronDown className={cn('size-5 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+    </Pill>
+    {open && <div id="roam-whos-in" className="absolute top-full right-0 mt-2 w-[24rem] max-w-[calc(100vw-3rem)]">{live.people}</div>}
+  </div>
+}
+
+/** The top of the room: the name at the left, the views and who's in mid, sound and full screen at the right. */
+function Bar({ app, tools, ready, live, act, box }:
+{ app: string; tools: boolean; ready: Ready; live?: Live; act: Act; box: HTMLElement | null }) {
   return <>
     <div className="absolute top-6 left-6 z-20 grid justify-items-start gap-3">
-      <h1 className={cn(pill(), 'inline-flex h-12 items-center px-5')}><Wordmark className="h-[26px]" /><span className="sr-only">ROAM</span></h1>
-      <div className="flex flex-wrap gap-2">
-        {ready && <Chip icon={<Video className="size-4" />}>{ready.scene.views} video views · {ready.scene.splats.toLocaleString('en-US')} splats</Chip>}
-        {live?.soundBlocked && <Chip icon={<VolumeX className="size-4" />}>sound off</Chip>}
-      </div>
+      <h1><Wordmark className="h-8" /><span className="sr-only">ROAM</span></h1>
+      {tools && ready && <Counts app={app} scene={ready.scene} />}
     </div>
-    <div className="absolute top-6 left-1/2 z-20 -translate-x-1/2 max-md:top-24">
+    <div className="absolute top-6 left-1/2 z-20 flex -translate-x-1/2 items-start gap-3 max-md:top-24">
       <Joined className={ready ? undefined : 'opacity-40'}>
         {VIEWS.map(([view, label]) => (
-          <Pill key={label} type="button" className="disabled:opacity-100" disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Pill>
+          <Pill key={label} type="button" className={cn(MAIN, 'disabled:opacity-100')} disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Pill>
         ))}
       </Joined>
+      {live && <WhosIn live={live} />}
     </div>
-    <Button type="button" variant="ghost" aria-label="Full screen" className={cn(bubble(), 'absolute top-6 right-6 z-20')} onClick={() => fill(box)}>
-      <Expand className="size-5" aria-hidden="true" />
-    </Button>
+    <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+      {/* Only a status, so not pressable, but as big as the full screen button beside it. */}
+      {live?.soundBlocked && <span role="img" aria-label="sound off" title="Sound off" className={cn(bubble('quiet', 'chip'), 'size-10')}>
+        <VolumeX className="size-5" aria-hidden="true" />
+      </span>}
+      <Button type="button" variant="ghost" aria-label="Full screen" className={bubble()} onClick={() => fill(box)}>
+        <Expand className="size-5" aria-hidden="true" />
+      </Button>
+    </div>
   </>
-}
-
-function Cameras({ ready, act }: { ready: Ready; act: Act }) {
-  return <div className={cn(pill('quiet', 'small'), 'inline-flex items-center gap-1 pr-1 normal-case', !ready && 'opacity-40')}>
-    <Label htmlFor="roam-camera" className="font-roam-label text-[15px] font-normal text-roam-peri lowercase">Camera</Label>
-    <NativeSelect id="roam-camera" className="h-8 border-0 bg-transparent font-roam text-[15px] text-roam-ink shadow-none dark:bg-transparent" disabled={!ready}
-      value={ready?.camera ?? ''} onChange={(event) => act({ type: 'go', view: Number(event.target.value) })}>
-      {ready?.scene.cameras.map((camera, index) => <NativeSelectOption key={camera.name} value={index}>{camera.name}</NativeSelectOption>)}
-    </NativeSelect>
-  </div>
-}
-
-// Rounding -0.0001 must read 0.000, not -0.000.
-const fixed = (value: number, places: number) => (Object.is(Math.round(value * 10 ** places), -0) ? 0 : value).toFixed(places)
-
-/** Where the camera is and faces, in the scan's own coordinates: one line to paste into a chat. */
-function whereText({ position, target }: Pose): string {
-  const facing = target.map((value, axis) => value - position[axis])
-  return `x ${fixed(position[0], 3)} y ${fixed(position[1], 3)} z ${fixed(position[2], 3)} facing ${facing.map((value) => fixed(value, 2)).join(' ')}`
-}
-
-function Where({ where }: { where: Pose | null }) {
-  // Copied until the person moves: the line then reads somewhere else.
-  const [copied, setCopied] = useState<string | null>(null)
-  const line = useRef<HTMLElement>(null)
-  if (!where) return null
-  const text = whereText(where)
-  // Some embedded browsers refuse the clipboard API; selecting the line and copying it the old way still works there.
-  const byHand = () => {
-    const range = document.createRange()
-    range.selectNodeContents(line.current!)
-    getSelection()?.removeAllRanges()
-    getSelection()?.addRange(range)
-    setCopied(document.execCommand('copy') ? text : null)
-  }
-  const copy = () => void (navigator.clipboard?.writeText(text) ?? Promise.reject(new Error('no clipboard'))).then(() => setCopied(text), byHand)
-  return <div className="flex flex-wrap items-center gap-1.5">
-    <Chip icon={<MapPin className="size-4" />}>
-      <span className="mr-1.5">You are at</span>
-      <code ref={line} className="select-all font-roam tabular-nums" aria-label="Camera position">{text}</code>
-    </Chip>
-    <Pill type="button" size="small" onClick={copy}>{copied === text ? 'Copied' : 'Copy'}</Pill>
-  </div>
 }
 
 /** The scanned room filling the screen: walked alone, or shared with whoever a live room holds. */
@@ -133,6 +110,7 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
   const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [watching, setWatching] = useState<{ id: string; saved: Pose } | null>(null)
   const [where, setWhere] = useState<Pose | null>(null)
+  const tools = toolsOn()
   const ready = state.status === 'ready' ? state : null
   const watched = live?.peers.find((peer) => peer.member.id === watching?.id) ?? null
   const stopped = state.status === 'error' || state.status === 'no-webgl'
@@ -142,21 +120,17 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
       {state.status === 'error' || state.status === 'no-webgl'
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
         : <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={ready?.pose ?? null} onEvent={dispatch}
-          peers={live?.peers} audio={live?.audio} onStance={live?.tell} onWhere={setWhere}
+          peers={live?.peers} audio={live?.audio} onStance={live?.tell} onWhere={tools ? setWhere : undefined}
           onPick={live && ((id, saved) => setWatching({ id, saved }))} />}
       {state.status === 'loading' && <Gathering progress={state.progress} />}
-      <Bar ready={ready} live={live} act={dispatch} box={box} />
+      <Bar app={app} tools={tools} ready={ready} live={live} act={dispatch} box={box} />
       <div className="absolute inset-x-6 bottom-6 z-20 flex flex-wrap items-end justify-between gap-3">
-        <div className="grid justify-items-start gap-2.5">
-          <Where where={ready && where} />
-          <Cameras ready={ready} act={dispatch} />
-        </div>
-        <p className="rounded-full border-2 border-roam-peri bg-roam-cream px-3.5 py-1 text-sm font-medium text-roam-ink">
+        {tools && <Placing ready={ready} where={where} go={(view) => dispatch({ type: 'go', view })} />}
+        <p className="text-sm font-medium text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
           Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster
         </p>
         {before}
       </div>
-      {live && <div className="absolute top-24 right-6 z-20 w-[24rem] max-w-[calc(100%-3rem)]">{live.people}</div>}
       {watched && watching && <Watch peer={watched} onClose={() => {
         dispatch({ type: 'look', pose: watching.saved })
         setWatching(null)
