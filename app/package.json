@@ -7,7 +7,7 @@
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "dev": "CLOUDFLARE_ENV=local vite",
+    "dev": "node scripts/dev.mjs",
     "build": "bash ../scripts/cf-build.sh",
     "build:app": "tsc -b && vite build",
     "vendor:hands": "node scripts/roam-vendor-hands.mjs",
@@ -15,6 +15,7 @@
     "prebuild:app": "npm run vendor:hands",
     "db:migrate:staging": "wrangler d1 migrations apply soon-hackathon-2026-db-staging --remote --env staging",
     "db:migrate:prod": "wrangler d1 migrations apply soon-hackathon-2026-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply soon-hackathon-2026-db-local --local --env local",
     "db:reset:staging": "node ../scripts/reset-staging-d1.mjs",
     "secrets:push": "node ../scripts/cf-secrets.mjs push",
     "secrets:check": "node ../scripts/cf-secrets.mjs check",
