@@ -54,8 +54,12 @@ beforeEach(() => {
     }
   }
   vi.stubGlobal("Response", Upgradable);
+  vi.useFakeTimers();
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 it("hands out the host's key once, so a guessed room id can not take over a room", async () => {
   const state = roomState();
@@ -100,6 +104,27 @@ it("sends a position to everyone else and remembers it for whoever joins next", 
   const third = await join(room, state);
   const welcome = third.socket.got()[0];
   expect(welcome.type === "welcome" && welcome.members).toContainEqual({ ...second.self, pose });
+});
+
+it("passes a cast to everyone else, and refuses one sent sooner than the wait", async () => {
+  const state = roomState();
+  const room = new RoamRoom(state);
+  const first = await join(room, state);
+  const second = await join(room, state);
+  vi.setSystemTime(new Date(10_000));
+  await sendTo(room, second.socket, { type: "cast", technique: "domain" });
+  expect(first.socket.got().at(-1)).toEqual({ type: "cast", id: second.self!.id, technique: "domain" });
+  expect(second.socket.got().some(message => message.type === "cast")).toBe(false);
+
+  const quiet = first.socket.sent.length;
+  vi.setSystemTime(new Date(11_000));
+  await sendTo(room, second.socket, { type: "cast", technique: "blue" });
+  expect(first.socket.sent.length).toBe(quiet);
+  expect(second.socket.closed).toBeNull();
+
+  vi.setSystemTime(new Date(20_000));
+  await sendTo(room, second.socket, { type: "cast", technique: "blue" });
+  expect(first.socket.got().at(-1)).toEqual({ type: "cast", id: second.self!.id, technique: "blue" });
 });
 
 it("passes a handshake only to the person it names, and drops one for nobody", async () => {

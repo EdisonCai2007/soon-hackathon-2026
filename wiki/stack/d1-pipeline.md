@@ -175,7 +175,6 @@ The timestamp prefix does real work: **filename order equals author order equals
 **The rule: migrations are additive and order-independent.** A slow branch can merge a migration with an *older* timestamp *after* a newer one already landed. A fresh database (staging after a reset, a new environment) then replays them in filename order — a different order than production applied them in. If every migration only *adds* (a new table, a new nullable column, a new index) that reordering is harmless. A migration that *depends on another having run first* — backfilling a column another migration added, say — breaks under replay. Keep each migration self-contained and additive; when a change genuinely needs ordering, fold it into a single migration file.
 
 Forward-only, too: no `down` scripts. A migration that shouldn't have shipped is fixed by a *new* migration (or, for production, [Time Travel](d1-recovery.md#a-bad-migration-reached-production)) — never by editing or deleting the file that already ran, which fresh databases still need to replay.
-
 ## Seeded staging, production untouched
 
 Staging is a **seeded fixture database, not a mirror of production.** `npm run db:reset:staging` runs [`scripts/reset-staging-d1.mjs`](#the-scripts), which:

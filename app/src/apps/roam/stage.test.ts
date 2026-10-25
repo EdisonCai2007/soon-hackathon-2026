@@ -35,7 +35,7 @@ function soundCard() {
 
 const member = (id: string, name = id): Member => ({ id, name, color: '#f97362', role: 'guest', pose: null })
 const peer = (id: string, at: { x: number; y: number; z: number }, stream: MediaStream | null = null): Peer =>
-  ({ member: member(id), motion: nextMotion(null, { ...at, yaw: 0 }, 1000), stream })
+  ({ member: member(id), motion: nextMotion(null, { ...at, yaw: 0 }, 1000), stream, cast: null })
 const stream = () => ({ getTracks: () => [] }) as unknown as MediaStream
 const camera = (at: [number, number, number]) => {
   const one = new PerspectiveCamera(55, 1, 0.1, 100)
@@ -84,7 +84,7 @@ it('stands a figure on the floor, facing the viewer, and moves it as its positio
 it('leaves a figure where it was until its person says otherwise', () => {
   const world = new Object3D()
   const stage = makeStage(world, scene, null)
-  const still: Peer = { member: member('a1'), motion: null, stream: null }
+  const still: Peer = { member: member('a1'), motion: null, stream: null, cast: null }
   stage.sync([still])
   stage.update(camera([0, 0, 5]), 1000)
   expect(world.children[0].position.x).toBe(0)

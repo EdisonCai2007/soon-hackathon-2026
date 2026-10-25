@@ -72,3 +72,5 @@ None.
 - **2026-10-25** — Asked whether to delete the placing tools for good, keep them behind `?tools`, or hold the ship for Edison → chose `?tools`: everything removed from the regular view was for tooling only.
 - **2026-10-25** — Asked whether to review before going live → chose to ship through `/ship`, with CI as the gate.
 - **2026-10-25** — Assumed: archived for shipping with the placing tools behind `?tools`, after bringing in `main`'s bedroom, haze and faces work, because `main`'s new scan changes the splat count the tools test reads.
+- **2026-10-25** — Assumed: `main`'s new hand reading, body walking and phone walk screens take the board's look too, the hands and *walk it* as pills top right beside sound and full screen, because a visitor meets them on the same screens.
+- **2026-10-25** — Assumed: the *who's in* list opens centred under the middle of the bar and is measured against the room, not the screen, because the frame rule keeps every page inside its frame.

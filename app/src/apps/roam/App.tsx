@@ -7,6 +7,7 @@ import '@fontsource/arimo/400.css'
 import { useNavigate, useParams } from 'react-router'
 import { StartRoom } from './Host'
 import { arrivalFrom } from './invite'
+import { Walk } from './Leave'
 import { Phone } from './Phone'
 import { Room } from './Room'
 import { Scan } from './Scan'
@@ -21,5 +22,6 @@ export function App() {
 
   if (arrival.kind === 'camera') return <Phone app={app} roomId={arrival.roomId} />
   if (arrival.kind === 'guest') return <Room app={app} roomId={arrival.roomId} />
+  if (arrival.kind === 'leave') return <Walk app={app} />
   return <Scan app={app} before={<StartRoom app={app} onStarted={(roomId) => void navigate(`/apps/${app}/r/${roomId}`)} />} />
 }

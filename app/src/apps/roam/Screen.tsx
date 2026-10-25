@@ -30,7 +30,8 @@ export function Halftone() {
     const element = canvas.current!
     const pen = element.getContext('2d')
     if (!pen) return
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+    // A browser that can not say whether motion is welcome gets the moving clouds, as most people do.
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
     // The dots take the canvas's text colour, so the yellow stays the theme's.
     const ink = getComputedStyle(element).color
     let size = ''

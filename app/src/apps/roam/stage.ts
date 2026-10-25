@@ -15,6 +15,7 @@ type Figure = { mesh: Mesh; material: MeshBasicMaterial; video: HTMLVideoElement
 export type Stage = {
   sync: (peers: readonly Peer[]) => void
   update: (camera: PerspectiveCamera, now: number) => void
+  /** Whom a press in the view landed on, by peer id. */
   pick: (pointer: Vector2, camera: PerspectiveCamera) => string | null
   dispose: () => void
 }
@@ -125,8 +126,8 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
       const caster = new Raycaster()
       caster.setFromCamera(pointer, camera)
       const meshes = [...figures].map(([id, figure]) => ({ id, mesh: figure.mesh }))
-      // A figure moved since the last frame is hit where it stands now, not where it was drawn.
-      for (const { mesh } of meshes) mesh.updateMatrixWorld()
+      // A press can land between frames, and a raycast reads the world matrix the last frame left behind.
+      for (const one of meshes) one.mesh.updateWorldMatrix(true, false)
       const hit = caster.intersectObjects(meshes.map((one) => one.mesh), false)[0]
       return meshes.find((one) => one.mesh === hit?.object)?.id ?? null
     },

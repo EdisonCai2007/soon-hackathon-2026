@@ -39,8 +39,16 @@ const CHAIRS: Placement = {
   anchor: [-0.861, -0.282],
 }
 
+// Doing jumping jacks in the old bedroom upstairs, on Edison's spot and facing the door; he starts at the origin.
+const BEDROOM: Placement = {
+  url: '/apps/roam/bedroom.glb',
+  at: [-0.913, 0.208, -0.659],
+  facing: [0.6, -0.13, 0.79],
+  anchor: [0, 0],
+}
+
 /** Every filmed clip the scan plays. */
-export const CLIPS: readonly Placement[] = [COUCH, FIREPLACE, CHAIRS]
+export const CLIPS: readonly Placement[] = [COUCH, FIREPLACE, CHAIRS, BEDROOM]
 
 /** The turn about the vertical that points a model's +z (its people's front) along a heading. */
 export const yawFor = ([x, , z]: Vec3): number => Math.atan2(x, z)
@@ -83,6 +91,9 @@ export function eyeMaterials(model: Object3D): Material[] {
 async function placeClip(loader: GLTFLoader, placement: Placement, scene: Scene) {
   const gltf = await loader.loadAsync(placement.url)
   for (const material of eyeMaterials(gltf.scene)) showPupils(material)
+  // Three culls a skinned part by its bounds from one pose; the clip walks the small ones (eyes, hair) out of
+  // them, and up close they vanished. A handful of parts per clip costs nothing to always draw.
+  gltf.scene.traverse((part) => { part.frustumCulled = false })
   const { position, yaw, scale } = originFor(placement, scene)
   const group = new Group()
   group.position.fromArray(position)

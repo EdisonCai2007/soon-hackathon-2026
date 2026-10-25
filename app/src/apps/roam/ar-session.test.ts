@@ -11,15 +11,18 @@ const orientation = (yaw: number) => {
 }
 
 // The browser's AR session, stood in: a test hands it one frame at a time.
-function session(options: { pose?: unknown } = {}) {
+function session(options: { pose?: unknown; overlay?: boolean; gl?: boolean } = {}) {
   const frames: Frame[] = []
   const ends: (() => void)[] = []
   const fake = {
     asked: [] as unknown[],
+    states: [] as object[],
     requestReferenceSpace: vi.fn((type: string) => Promise.resolve({ type })),
     requestAnimationFrame: (callback: Frame) => { frames.push(callback) },
+    updateRenderState: vi.fn((state: object) => { fake.states.push(state); return Promise.resolve() }),
     end: vi.fn(() => Promise.resolve()),
     addEventListener: (name: string, listener: () => void) => { if (name === 'end') ends.push(listener) },
+    domOverlayState: options.overlay === false ? null : { type: 'screen' },
     tick: (pose: unknown = options.pose) => {
       const next = frames.pop()
       next?.(0, { getViewerPose: () => pose })
@@ -31,12 +34,20 @@ function session(options: { pose?: unknown } = {}) {
     requestSession: vi.fn((mode: string, init?: object) => { fake.asked.push({ mode, init }); return Promise.resolve(fake) }),
   }
   vi.stubGlobal('navigator', { ...navigator, xr })
-  return { fake, xr }
+  // The layer the session needs before it answers with any pose at all, and the context it is built from.
+  const makeXRCompatible = vi.fn(() => Promise.resolve())
+  vi.stubGlobal('XRWebGLLayer', class { constructor(session: unknown, gl: unknown) { Object.assign(this, { session, gl }) } })
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((kind: string) =>
+    kind === 'webgl' && options.gl !== false ? { makeXRCompatible } : null) as typeof HTMLCanvasElement.prototype.getContext)
+  return { fake, xr, makeXRCompatible }
 }
 
 const hooks = () => ({ onPose: vi.fn(), onLost: vi.fn(), onEnd: vi.fn() })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 it('says whether this browser can follow the phone through the room', async () => {
   const { xr } = session()
@@ -52,11 +63,14 @@ it('says whether this browser can follow the phone through the room', async () =
 
 it('reports where the phone is, in metres and the way it faces', async () => {
   const pose = { transform: { position: { x: 1, y: 1.5, z: -2 }, orientation: orientation(Math.PI / 2) } }
-  const { fake } = session({ pose })
+  const { fake, makeXRCompatible } = session({ pose })
   const listening = hooks()
   await startAr(listening)
   expect(fake.asked).toEqual([{ mode: 'immersive-ar', init: { requiredFeatures: ['local-floor'] } }])
   expect(fake.requestReferenceSpace).toHaveBeenCalledWith('local-floor')
+  // Checked on a real phone: with no layer, 823 frames in a row answered with no pose at all.
+  expect(makeXRCompatible).toHaveBeenCalled()
+  expect(fake.states).toEqual([{ baseLayer: expect.any(Object) }])
 
   fake.tick()
   expect(listening.onPose).toHaveBeenCalledTimes(1)
@@ -109,4 +123,53 @@ it('copes with a session that refuses to end', async () => {
 it('refuses to start where the browser has no AR at all', async () => {
   vi.stubGlobal('navigator', { ...navigator, xr: undefined })
   await expect(startAr(hooks())).rejects.toThrow('This browser has no AR.')
+})
+
+it('asks for the page’s own controls over the camera view, and says whether it got them', async () => {
+  const pose = { transform: { position: { x: 0, y: 1.2, z: 0 }, orientation: orientation(0) } }
+  const root = document.createElement('div')
+  const { fake } = session({ pose })
+  const running = await startAr(hooks(), root)
+  expect(fake.asked).toEqual([{ mode: 'immersive-ar', init: { requiredFeatures: ['local-floor'],
+    optionalFeatures: ['dom-overlay'], domOverlay: { root } } }])
+  expect(running.overlaid).toBe(true)
+
+  const bare = session({ pose, overlay: false })
+  expect((await startAr(hooks(), root)).overlaid).toBe(false)
+  expect(bare.fake.asked).toHaveLength(1)
+})
+
+it('hands the session to a drawing instead of reading frames itself', async () => {
+  const pose = { transform: { position: { x: 0, y: 1, z: 0 }, orientation: orientation(0) } }
+  const { fake, makeXRCompatible } = session({ pose })
+  const listening = hooks()
+  const drawing = { take: vi.fn(async () => {}) }
+  const running = await startAr(listening, null, drawing)
+  expect(drawing.take).toHaveBeenCalledWith(fake)
+  // The drawing attaches a real layer of its own, so neither the dummy one nor a second pose reader is made.
+  expect(makeXRCompatible).not.toHaveBeenCalled()
+  expect(fake.states).toEqual([])
+  expect(fake.requestReferenceSpace).not.toHaveBeenCalled()
+  expect(running.overlaid).toBe(true)
+
+  running.stop()
+  expect(fake.end).toHaveBeenCalled()
+  fake.finish()
+  expect(listening.onEnd).toHaveBeenCalledTimes(1)
+})
+
+it('starts anyway where there is no layer to attach, so one phone’s quirk is not a dead end', async () => {
+  const pose = { transform: { position: { x: 0, y: 1, z: 0 }, orientation: orientation(0) } }
+  const { fake } = session({ pose, gl: false })
+  const listening = hooks()
+  await startAr(listening)
+  expect(fake.states).toEqual([])
+  fake.tick()
+  expect(listening.onPose).toHaveBeenCalledTimes(1)
+
+  // A browser with no XRWebGLLayer at all, such as an older Chrome.
+  const older = session({ pose })
+  vi.stubGlobal('XRWebGLLayer', undefined)
+  await startAr(hooks())
+  expect(older.fake.states).toEqual([])
 })

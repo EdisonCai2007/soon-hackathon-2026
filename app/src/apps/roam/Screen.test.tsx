@@ -58,6 +58,13 @@ it('draws once and holds still when the person asks for less motion', () => {
   expect(frames).toHaveLength(0)
 })
 
+it('keeps the clouds moving where the browser can not say whether motion is welcome', () => {
+  vi.stubGlobal('matchMedia', undefined)
+  render(<Halftone />)
+  step(0)
+  expect(frames).toHaveLength(1)
+})
+
 it('stops drawing once it is gone', () => {
   motion(false)
   const { unmount } = render(<Halftone />)

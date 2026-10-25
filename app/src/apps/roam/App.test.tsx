@@ -97,7 +97,7 @@ it('with tools, links the scan’s counts to their files and jumps to any filmed
   expect(camera().disabled).toBe(true)
   send({ type: 'ready', scene })
   expect(screen.getByRole('link', { name: '1199 video views' }).getAttribute('href')).toBe('/apps/roam/scene.json')
-  expect(screen.getByRole('link', { name: '763,948 splats' }).getAttribute('href')).toBe('/apps/roam/room.spz')
+  expect(screen.getByRole('link', { name: '757,543 splats' }).getAttribute('href')).toBe('/apps/roam/room.spz')
   expect(camera().options).toHaveLength(1199)
   expect(camera().value).toBe('0')
   fireEvent.change(camera(), { target: { value: '3' } })
@@ -162,8 +162,11 @@ it('gives a plain message on a browser without 3D', async () => {
 it('walks the scan alone, with nobody in it and no room in the address', async () => {
   await open()
   send({ type: 'ready', scene })
-  expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onPick: undefined, onStance: undefined })
+  // Nobody to draw or hear, and nobody to tell: where the walker stands is still kept, because walking the scan
+  // with your own body starts from it, and a press still lands, though alone it watches nobody.
+  expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onStance: expect.any(Function), onPick: expect.any(Function) })
   expect(screen.queryByRole('img', { name: 'sound off' })).toBeNull()
+  expect(screen.queryByText(/left here/)).toBeNull()
   expect(button('Start a room')).toBeTruthy()
 })
 
@@ -179,4 +182,15 @@ it("opens a shared link at the way in, and the camera link at the phone's screen
   cleanup()
 
   await open('/apps/roam/phone/0123456789abcdef0123', { '/apps/roam/scene.json': scene }, heading('Be the camera'))
+  cleanup()
+
+  await open('/apps/roam/leave', { '/apps/roam/scene.json': scene }, heading('Walk the home'))
+})
+
+it('does nothing when a press lands on a person while walking the place alone', async () => {
+  await open()
+  send({ type: 'ready', scene })
+  await act(() => viewer.props!.onPick!('a1', poseFor(scene, 0)))
+  expect(screen.queryByText(/up close/)).toBeNull()
+  expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
 })

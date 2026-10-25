@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { arrivalFrom, cameraLink, inviteLink, isRoomId } from './invite'
+import { arrivalFrom, cameraLink, inviteLink, isRoomId, leaveLink } from './invite'
 
 const id = '0123456789abcdef0123'
 
@@ -13,6 +13,15 @@ it('joins as a guest or as the camera from the address', () => {
   expect(arrivalFrom(`r/${id}`)).toEqual({ kind: 'guest', roomId: id })
   expect(arrivalFrom(`/r/${id}/`)).toEqual({ kind: 'guest', roomId: id })
   expect(arrivalFrom(`phone/${id}`)).toEqual({ kind: 'camera', roomId: id })
+})
+
+it('opens the phone’s walk screen, which belongs to no room', () => {
+  expect(arrivalFrom('leave')).toEqual({ kind: 'leave' })
+  expect(arrivalFrom('/leave/')).toEqual({ kind: 'leave' })
+  // A room id after it is nobody's address.
+  expect(arrivalFrom(`leave/${id}`)).toEqual({ kind: 'alone' })
+  expect(leaveLink('https://site.example', 'roam')).toBe('https://site.example/apps/roam/leave')
+  expect(arrivalFrom(new URL(leaveLink('https://site.example', 'roam')).pathname.replace('/apps/roam/', ''))).toEqual({ kind: 'leave' })
 })
 
 it('knows a room id', () => {

@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loading } from '@/components/Loading'
 import { cn } from '@/lib/utils'
 import { arSupported, startAr, type ArSession } from './ar-session'
+import { CannotFollow, Checking } from './PhoneStart'
 import { inviteLink } from './invite'
 import { useLiveRoom } from './live-room'
 import type { Pose } from './messages'
 import { anchorAt, toScanPose } from './placement'
 import { Pill } from './Pill'
 import { pill } from './pill-look'
-import { parseScene, type Scene } from './scene'
-import { card, Centered, Halftone, Screen, title } from './Screen'
+import { loadScene, type Scene } from './scene'
+import { Centered, title } from './Screen'
 
 // The taped spot is the room's first filmed camera: it is on the route the scan looks best along.
 const SPOT = 0
@@ -27,12 +27,14 @@ export function Phone({ app, roomId }: { app: string; roomId: string }) {
   const [scene, setScene] = useState<Scene | null>(null)
   const [lost, setLost] = useState(false)
   const session = useRef<ArSession | null>(null)
+  // The session takes over the screen, so the page's own controls go to the browser as an overlay over the camera.
+  const controls = useRef<HTMLDivElement>(null)
   const room = useLiveRoom(app, roomId, 'Camera', 'camera')
   const { tell } = room
 
   useEffect(() => {
     void arSupported().then((yes) => setStep(yes ? 'ready' : 'unsupported'))
-    void fetch(`/apps/${app}/scene.json`).then((response) => response.json()).then((data: unknown) => setScene(parseScene(data))).catch(() => setScene(null))
+    void loadScene(`/apps/${app}/scene.json`).then(setScene).catch(() => setScene(null))
     return () => session.current?.stop()
   }, [app])
 
@@ -44,38 +46,29 @@ export function Phone({ app, roomId }: { app: string; roomId: string }) {
       tell(toScanPose(pose, anchor, here))
     }
     try {
-      session.current = await startAr({ onPose, onLost: () => setLost(true), onEnd: () => setStep('ready') })
+      session.current = await startAr({ onPose, onLost: () => setLost(true), onEnd: () => setStep('ready') }, controls.current)
       setStep('live')
     } catch { setStep('unsupported') }
   }
 
-  if (step === 'checking' || !scene) {
-    return <Screen className="grid place-items-center p-6">
-      <Loading label="Looking at what this phone can do…" className="contents">
-        <Halftone />
-        <p className={cn(card, 'relative text-2xl font-bold')}>Looking at what this phone can do…</p>
-      </Loading>
-    </Screen>
-  }
+  if (step === 'checking' || !scene) return <Checking />
   if (step === 'unsupported') {
-    return <Centered className={COLUMN}>
-      <h1 className={title}>Be the camera</h1>
+    return <CannotFollow title="Be the camera">
       <p>{ADVICE}</p>
       <a className={cn(pill('loud'), 'inline-flex items-center no-underline')} href={inviteLink(location.origin, app, roomId)}>Join as a guest</a>
-    </Centered>
+    </CannotFollow>
   }
   return <Centered className={COLUMN}>
-      <h1 className={title}>Be the camera</h1>
-      {step === 'ready'
-        ? <>
-          <p>Stand on the marked spot, facing the arrow, and hold the phone up.</p>
-          <Pill type="button" look="loud" onClick={() => void lineUp(scene)}>I’m here</Pill>
-        </>
-        : <>
-          <p role="status">You’re live. Walk the room normally — people watching see you where you are.</p>
-          {lost && <p className="rounded-3xl border-2 border-roam-red px-4 py-3 font-semibold">Hold still for a moment: the phone has lost track of the room.</p>}
-          <Pill type="button" onClick={() => { session.current?.stop(); setStep('ready') }}>Stop</Pill>
-        </>}
-      {room.failure && <p className="rounded-full border-2 border-roam-red px-3.5 py-1 text-sm font-medium">{room.failure}</p>}
+    <h1 className={title}>Be the camera</h1>
+    {step === 'ready' && <>
+      <p>Stand on the marked spot, facing the arrow, and hold the phone up.</p>
+      <Pill type="button" look="loud" onClick={() => void lineUp(scene)}>I’m here</Pill>
+    </>}
+    <div ref={controls} className={step === 'live' ? 'grid w-full justify-items-start gap-4' : 'hidden'}>
+      <p role="status">You’re live. Walk the room normally — people watching see you where you are.</p>
+      {lost && <p className="rounded-3xl border-2 border-roam-red px-4 py-3 font-semibold">Hold still for a moment: the phone has lost track of the room.</p>}
+      <Pill type="button" onClick={() => { session.current?.stop(); setStep('ready') }}>Stop</Pill>
+    </div>
+    {room.failure && <p className="rounded-full border-2 border-roam-red px-3.5 py-1 text-sm font-medium">{room.failure}</p>}
   </Centered>
 }

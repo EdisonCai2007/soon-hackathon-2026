@@ -1,16 +1,19 @@
 import { ChevronDown, Expand, VolumeX } from 'lucide-react'
-import { useReducer, useState, type ReactNode } from 'react'
+import { useCallback, useReducer, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Hands, WalkIt, Walking } from './Body'
+import { useCasts, useTechniqueSounds, type Casting } from './casting'
 import type { Pose as Stance } from './messages'
 import { Joined, Pill } from './Pill'
 import { bubble } from './pill-look'
 import type { Peer } from './presence'
 import { RoomViewer } from './RoomViewer'
-import type { Pose, View } from './scene'
+import type { Pose, Scene, View } from './scene'
 import { card, Halftone, Screen, title } from './Screen'
 import { toolsOn } from './invite'
 import { Counts, Placing } from './Tools'
+import { useRoomAr, type RoomAr } from './use-room-ar'
 import { initialViewer, viewerReducer, type ViewerEvent, type ViewerState } from './viewer-state'
 import { Watch } from './Watch'
 import { Wordmark } from './Wordmark'
@@ -27,6 +30,8 @@ export type Live = {
   tell: (stance: Stance) => void
   people: ReactNode
   notice?: ReactNode
+  /** Hand reading for this page: off until the person asks for it. */
+  casting: Casting
 }
 
 const loadingLabel = (progress: number | null) =>
@@ -65,20 +70,18 @@ type Act = (event: ViewerEvent) => void
 const MAIN = 'hover:bg-roam-red hover:text-white'
 
 /** Who is in the room, folded under one pill beside the views until it is opened. */
-function WhosIn({ live }: { live: Live }) {
-  const [open, setOpen] = useState(false)
-  return <div className="relative">
-    <Pill type="button" className={MAIN} aria-expanded={open} aria-controls="roam-whos-in" onClick={() => setOpen(!open)}>
-      who’s in · {live.peers.length + 1}
-      <ChevronDown className={cn('size-5 transition-transform', open && 'rotate-180')} aria-hidden="true" />
-    </Pill>
-    {open && <div id="roam-whos-in" className="absolute top-full right-0 mt-2 w-[24rem] max-w-[calc(100vw-3rem)]">{live.people}</div>}
-  </div>
+function WhosIn({ live, open, toggle }: { live: Live; open: boolean; toggle: () => void }) {
+  return <Pill type="button" className={MAIN} aria-expanded={open} aria-controls="roam-whos-in" onClick={toggle}>
+    who’s in · {live.peers.length + 1}
+    <ChevronDown className={cn('size-5 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+  </Pill>
 }
 
-/** The top of the room: the name at the left, the views and who's in mid, sound and full screen at the right. */
-function Bar({ app, tools, ready, live, act, box }:
-{ app: string; tools: boolean; ready: Ready; live?: Live; act: Act; box: HTMLElement | null }) {
+type BarProps = { app: string; tools: boolean; ready: Ready; live?: Live; act: Act; box: HTMLElement | null; walk: RoomAr; stance: Stance | null }
+
+/** The top of the room: the name at the left, the views and who's in mid, the body, sound and full screen right. */
+function Bar({ app, tools, ready, live, act, box, walk, stance }: BarProps) {
+  const [open, setOpen] = useState(false)
   return <>
     <div className="absolute top-6 left-6 z-20 grid justify-items-start gap-3">
       <h1><Wordmark className="h-8" /><span className="sr-only">ROAM</span></h1>
@@ -90,9 +93,15 @@ function Bar({ app, tools, ready, live, act, box }:
           <Pill key={label} type="button" className={cn(MAIN, 'disabled:opacity-100')} disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Pill>
         ))}
       </Joined>
-      {live && <WhosIn live={live} />}
+      {live && <WhosIn live={live} open={open} toggle={() => setOpen(!open)} />}
     </div>
-    <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+    {/* Measured against the room's own box, not the screen, so it keeps inside the frame on a phone. */}
+    {live && open && <div id="roam-whos-in" className="absolute top-20 left-1/2 z-20 w-[24rem] max-w-[calc(100%-3rem)] -translate-x-1/2 max-md:top-36">
+      {live.people}
+    </div>}
+    <div className="absolute top-6 right-6 z-20 flex max-w-[40%] flex-wrap items-center justify-end gap-2">
+      {live && <Hands casting={live.casting} />}
+      <WalkIt walk={walk} stance={stance} />
       {/* Only a status, so not pressable, but as big as the full screen button beside it. */}
       {live?.soundBlocked && <span role="img" aria-label="sound off" title="Sound off" className={cn(bubble('quiet', 'chip'), 'size-10')}>
         <VolumeX className="size-5" aria-hidden="true" />
@@ -104,31 +113,61 @@ function Bar({ app, tools, ready, live, act, box }:
   </>
 }
 
+type ViewProps = {
+  app: string
+  live?: Live
+  scene: Scene | null
+  pose: Pose | null
+  act: Act
+  onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
+  stance: Stance | null
+  onStance: (stance: Stance) => void
+  onWhere?: (pose: Pose) => void
+}
+
+/** The scan itself, with the techniques running over it and where this person's own view stands. */
+function View({ app, live, scene, pose, act, onPick, stance, onStance, onWhere }: ViewProps) {
+  const casts = useCasts(live?.peers, live?.casting.mine, stance)
+  useTechniqueSounds(live?.audio, casts, scene, stance)
+  return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
+    peers={live?.peers} audio={live?.audio} casts={casts} onPick={onPick} onStance={onStance}
+    onWhere={onWhere} />
+}
+
 /** The scanned room filling the screen: walked alone, or shared with whoever a live room holds. */
 export function Scan({ app, live, before }: { app: string; live?: Live; before?: ReactNode }) {
   const [state, dispatch] = useReducer(viewerReducer, initialViewer)
   const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [watching, setWatching] = useState<{ id: string; saved: Pose } | null>(null)
+  const [stance, setStance] = useState<Stance | null>(null)
   const [where, setWhere] = useState<Pose | null>(null)
   const tools = toolsOn()
   const ready = state.status === 'ready' ? state : null
   const watched = live?.peers.find((peer) => peer.member.id === watching?.id) ?? null
   const stopped = state.status === 'error' || state.status === 'no-webgl'
+  const overlay = useRef<HTMLDivElement>(null)
+  const tell = live?.tell
+  const walk = useRoomAr(`/apps/${app}/room.spz`, ready?.scene ?? null, {
+    onStance: tell,
+    onLeft: useCallback((pose: Pose) => dispatch({ type: 'look', pose }), []),
+    overlay,
+  })
 
   return <Screen>
     <div ref={setBox} onPointerDown={live?.unlock} className={cn('absolute inset-0 overflow-hidden', stopped ? 'grid place-items-center p-6' : 'bg-[#10151c]')}>
-      {state.status === 'error' || state.status === 'no-webgl'
+      {stopped
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
-        : <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={ready?.pose ?? null} onEvent={dispatch}
-          peers={live?.peers} audio={live?.audio} onStance={live?.tell} onWhere={tools ? setWhere : undefined}
-          onPick={live && ((id, saved) => setWatching({ id, saved }))} />}
+        : <View app={app} live={live} scene={ready?.scene ?? null} pose={ready?.pose ?? null} act={dispatch} stance={stance}
+          onStance={(here) => { setStance(here); tell?.(here) }} onWhere={tools ? setWhere : undefined}
+          onPick={(id, saved) => { if (live) setWatching({ id, saved }) }} />}
       {state.status === 'loading' && <Gathering progress={state.progress} />}
-      <Bar app={app} tools={tools} ready={ready} live={live} act={dispatch} box={box} />
+      <Bar app={app} tools={tools} ready={ready} live={live} act={dispatch} box={box} walk={walk} stance={stance} />
       <div className="absolute inset-x-6 bottom-6 z-20 flex flex-wrap items-end justify-between gap-3">
         {tools && <Placing ready={ready} where={where} go={(view) => dispatch({ type: 'go', view })} />}
-        <p className="text-sm font-medium text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
-          Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster
-        </p>
+        <div className="grid gap-1 text-sm font-medium text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
+          {walk.trouble && <p role="alert">{walk.trouble}</p>}
+          <p>Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster</p>
+        </div>
         {before}
       </div>
       {watched && watching && <Watch peer={watched} onClose={() => {
@@ -136,5 +175,6 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
         setWatching(null)
       }} />}
     </div>
+    <Walking walk={walk} overlay={overlay} />
   </Screen>
 }

@@ -2,8 +2,11 @@
 // screens and the viewer read the same room and the rules are tested without a socket.
 import type { Member, Pose, RoomMessage } from './messages'
 import { nextMotion, type Motion } from './pose-feed'
+import type { TechniqueName } from './techniques'
 
-export type Peer = { member: Member; motion: Motion | null; stream: MediaStream | null }
+/** What somebody cast and when, so the viewer can draw it from its own clock. */
+type Casting = { technique: TechniqueName; at: number }
+export type Peer = { member: Member; motion: Motion | null; stream: MediaStream | null; cast: Casting | null }
 type RoomStatus = 'joining' | 'live' | 'full' | 'removed' | 'dropped'
 
 export type PresenceState = {
@@ -26,7 +29,10 @@ const ordered = (peers: Peer[]): Peer[] =>
   [...peers].sort((one, two) => one.member.name.localeCompare(two.member.name) || one.member.id.localeCompare(two.member.id))
 
 const asPeer = (member: Member, at: number): Peer =>
-  ({ member, motion: member.pose ? nextMotion(null, member.pose, at) : null, stream: null })
+  ({ member, motion: member.pose ? nextMotion(null, member.pose, at) : null, stream: null, cast: null })
+
+const casting = (peers: Peer[], id: string, technique: TechniqueName, at: number): Peer[] =>
+  peers.map((peer) => (peer.member.id === id ? { ...peer, cast: { technique, at } } : peer))
 
 const withPeer = (peers: Peer[], member: Member, at: number): Peer[] =>
   ordered([...peers.filter((peer) => peer.member.id !== member.id), asPeer(member, at)])
@@ -45,6 +51,8 @@ function fromRoom(state: PresenceState, message: RoomMessage, at: number): Prese
       return { ...state, peers: state.peers.filter((peer) => peer.member.id !== message.id) }
     case 'pose':
       return { ...state, peers: moved(state.peers, message.id, message.pose, at) }
+    case 'cast':
+      return { ...state, peers: casting(state.peers, message.id, message.technique, at) }
     case 'closed':
       return { ...state, status: message.reason === 'full' ? 'full' : 'removed', peers: [] }
     // A handshake is the connections' business, not the room's picture.
