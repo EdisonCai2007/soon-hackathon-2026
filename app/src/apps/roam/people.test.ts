@@ -2,10 +2,25 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, it } from 'vitest'
-import { COUCH, originFor, yawFor } from './people'
+import { Group, Scene as World } from 'three'
+import { expect, it, vi } from 'vitest'
+import { addPeople, COUCH, originFor, yawFor } from './people'
 import { floorHeight, unitsPerMetre } from './placement'
 import { parseScene } from './scene'
+
+// A stand-in model: one part that slides two units along x over two seconds.
+const model = vi.hoisted(() => ({ loaded: [] as string[] }))
+vi.mock('three/examples/jsm/loaders/GLTFLoader.js', async () => {
+  const { AnimationClip, Group, VectorKeyframeTrack } = await vi.importActual<typeof import('three')>('three')
+  class GLTFLoader {
+    setMeshoptDecoder() { return this }
+    async loadAsync(url: string) {
+      model.loaded.push(url)
+      return { scene: new Group(), animations: [new AnimationClip('slide', 2, [new VectorKeyframeTrack('.position', [0, 2], [0, 0, 0, 2, 0, 0])])] }
+    }
+  }
+  return { GLTFLoader }
+})
 
 const scene = parseScene(JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../public/apps/roam/scene.json'), 'utf8')))
 
@@ -26,4 +41,25 @@ it('puts the anchored person on the spot, on the floor under it', () => {
   const z = position[2] + (-ax * Math.sin(yaw) + az * Math.cos(yaw)) * scale
   expect(x).toBeCloseTo(COUCH.at[0])
   expect(z).toBeCloseTo(COUCH.at[2])
+})
+
+it('adds the clip where it belongs and replays it without end', async () => {
+  const world = new World()
+  const people = await addPeople(world, scene)
+  expect(model.loaded).toEqual([COUCH.url])
+  const placed = world.children.find((child) => child instanceof Group)!
+  const { position, yaw, scale } = originFor(COUCH, scene)
+  expect(placed.position.toArray()).toEqual(position)
+  expect(placed.rotation.y).toBeCloseTo(yaw)
+  expect(placed.scale.x).toBeCloseTo(scale)
+  // Lit, so the model is seen at all.
+  expect(world.children).toHaveLength(3)
+  const [part] = placed.children
+  people.update(1)
+  expect(part.position.x).toBeCloseTo(1)
+  // Past its two seconds the clip starts again rather than stopping at the end.
+  people.update(2.5)
+  expect(part.position.x).toBeCloseTo(1.5)
+  people.dispose()
+  expect(world.children).toHaveLength(0)
 })

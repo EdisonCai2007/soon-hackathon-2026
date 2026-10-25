@@ -61,6 +61,17 @@ vi.mock('@sparkjsdev/spark', async () => {
   return { SparkRenderer, SplatMesh }
 })
 
+// The filmed people load on their own; each test settles the load it is about.
+const clips = vi.hoisted(() => ({
+  loads: [] as { arrive: () => void; fail: (error: Error) => void; update: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }[],
+}))
+vi.mock('./people', () => ({
+  addPeople: () => new Promise((resolve, reject) => {
+    const load = { update: vi.fn(), dispose: vi.fn(), arrive: () => resolve(load), fail: reject }
+    clips.loads.push(load)
+  }),
+}))
+
 const details: unknown = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../public/apps/roam/scene.json'), 'utf8'))
 const scene = parseScene(details)
 let resized: () => void = () => {}
@@ -84,6 +95,7 @@ afterEach(() => {
   fakes.renderers.length = 0
   fakes.sparks.length = 0
   fakes.splats.length = 0
+  clips.loads.length = 0
 })
 
 const show = (onEvent = vi.fn()) => {
@@ -122,6 +134,43 @@ it('loads the scan upright, reports progress, then draws each frame', async () =
   draw(1000)
   draw(1050)
   expect(renderer.render).toHaveBeenCalledTimes(2)
+})
+
+it('plays the filmed people once they arrive, each frame, and lets them go on leaving', async () => {
+  const { unmount } = show()
+  await settle()
+  fakes.splats[0].finish()
+  await settle()
+  const [clip] = clips.loads
+  clip.arrive()
+  await settle()
+  const draw = fakes.renderers[0].setAnimationLoop.mock.calls[0][0] as (time: number) => void
+  draw(1000)
+  draw(1500)
+  expect(clip.update.mock.calls).toEqual([[0], [0.5]])
+  unmount()
+  expect(clip.dispose).toHaveBeenCalled()
+})
+
+it('lets go of people that arrive after the page left, and keeps the room when they fail', async () => {
+  const early = show()
+  await settle()
+  fakes.splats[0].finish()
+  await settle()
+  early.unmount()
+  clips.loads[0].arrive()
+  await settle()
+  expect(clips.loads[0].dispose).toHaveBeenCalled()
+
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const { onEvent } = show()
+  await settle()
+  fakes.splats[1].finish()
+  await settle()
+  clips.loads[1].fail(new Error('missing model'))
+  await settle()
+  expect(console.error).toHaveBeenCalledWith(new Error('missing model'))
+  expect(onEvent).toHaveBeenLastCalledWith({ type: 'ready', scene })
 })
 
 it('fits the drawing to its box, skipping a box with no size', () => {
