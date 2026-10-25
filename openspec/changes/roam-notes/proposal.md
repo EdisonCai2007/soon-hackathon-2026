@@ -1,6 +1,6 @@
 # The home remembers
 
-**Status:** planned
+**Status:** in progress — the place and the scan side are built and tested; the phone's own screen waits on a check with a real phone, and the scale and the taped spots wait on the owner being in the home.
 **Branch:** roam-notes
 **Open questions:** none
 
@@ -96,3 +96,7 @@ Non-goals: leaving a note from inside the scan on a laptop, an iPhone leaving no
 - **2026-10-24** — Assumed: media is kept in the app's own database rather than object storage, because R2 needs a payment method this account has not set and a short clip or a shrunken photo sits far below what a database value holds.
 - **2026-10-24** — Assumed: caps on what anyone may leave — a short line of text, a few seconds of voice, a shrunken photo, and a limit per place — because the address is open to anyone who has it.
 - **2026-10-24** — Found while planning: the default branch now carries a two-floor scan and a reconstruction pipeline that already aligns a fresh scan onto the existing one, so the later change that shows what changed is cheaper than it looked, and this change plans against the bigger home.
+- **2026-10-24** — Found while building: a press can land between two frames, and a raycast reads whatever world matrix the last frame left behind, so picking brings its own candidates up to date. Without that, a marker was judged to sit at the middle of the room.
+- **2026-10-24** — Found while building: `Notes.tsx` and `notes.ts` are one name on a case-insensitive filesystem, so the screen is `NotePanel.tsx`.
+- **2026-10-24** — Asked what a preview should show, with the separate bodies work sitting uncommitted on this branch → chose this change alone; the bodies work was committed on its own `roam-body` branch and left for its own review.
+- **2026-10-24** — Checkpoint: the place, its five routes and the scan side pass on their own — every ROAM file at 100% of lines, branches, functions and statements, with lint, types, knip, repeated code and the key and action checks clean. The whole suite still times out in places on this Windows machine under full parallel load, before this change as well as after; CI is the gate.
