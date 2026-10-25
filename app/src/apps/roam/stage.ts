@@ -1,17 +1,22 @@
-// The people inside the 3D world: a camera-facing plane each, their video on it, and their voice placed by
-// where they stand. placement.ts and audio.ts own the numbers; this holds what the GPU and sound card need.
-import { Euler, Mesh, MeshBasicMaterial, PlaneGeometry, Raycaster, VideoTexture, type Object3D, type PerspectiveCamera, type Vector2 } from 'three'
+// The people inside the 3D world: a head, a torso and two hands each, their video on the face, their voice
+// placed by where they stand. placement.ts and audio.ts own the numbers; this holds what the GPU needs.
+import { BoxGeometry, Euler, Group, Mesh, MeshBasicMaterial, PlaneGeometry, Raycaster, Vector3, VideoTexture, type Object3D, type PerspectiveCamera, type Vector2 } from 'three'
 import { gainFor, listenerFrom, rangeFor, type Range } from './audio'
 import type { Pose } from './messages'
 import type { Note, NoteKind } from './notes'
 import { playNow } from './play'
-import { billboardYaw, figureSize, standing } from './placement'
-import { poseAt } from './pose-feed'
+import { billboardYaw, facePlacement, figureSize, handSwing, rigParts, standing, type Rig } from './placement'
+import { clamp01, poseAt } from './pose-feed'
 import type { Peer } from './presence'
 import type { Scene } from './scene'
 
 type Voice = { gain: GainNode; panner: PannerNode }
-type Figure = { mesh: Mesh; material: MeshBasicMaterial; video: HTMLVideoElement | null; texture: VideoTexture | null; voice: Voice | null; pose: Pose }
+type Body = { group: Group; head: Mesh; hands: [Mesh, Mesh]; face: Mesh; parts: Mesh[] }
+type Figure = Body & {
+  material: MeshBasicMaterial; faceMaterial: MeshBasicMaterial
+  video: HTMLVideoElement | null; texture: VideoTexture | null; voice: Voice | null
+  pose: Pose; walked: number; pace: number
+}
 
 /** What a press in the view landed on: somebody in the room, or something left in the place. */
 export type Picked = { kind: 'peer' | 'note'; id: string }
@@ -29,6 +34,9 @@ const MARKED: Record<NoteKind, string> = { text: '#ffd166', voice: '#4fb8ff', ph
 
 // A voice does not jump to its new loudness, or walking fast would click.
 const SMOOTH_S = 0.08
+
+// How quickly a walking pace is followed. Long enough that one jumpy frame does not throw the hands.
+const PACE_SMOOTH_MS = 200
 
 function playing(stream: MediaStream): HTMLVideoElement {
   const video = document.createElement('video')
@@ -71,21 +79,68 @@ function listen(context: AudioContext, camera: PerspectiveCamera) {
     [listener.upX, up[0]], [listener.upY, up[1]], [listener.upZ, up[2]]] as [AudioParam, number][]) param.setValueAtTime(value, now)
 }
 
+/** One body, built from the shared shapes: the parts in their resting places, facing straight ahead. */
+function bodyFrom(shapes: Shapes, rig: Rig, material: MeshBasicMaterial, faceMaterial: MeshBasicMaterial): Body {
+  const group = new Group()
+  const head = new Mesh(shapes.head, material)
+  const torso = new Mesh(shapes.torso, material)
+  const hands: [Mesh, Mesh] = [new Mesh(shapes.hand, material), new Mesh(shapes.hand, material)]
+  const face = new Mesh(shapes.face, faceMaterial)
+  head.position.set(...rig.head.at)
+  torso.position.set(...rig.torso.at)
+  const [side, up, forward] = rig.hand.at
+  hands[0].position.set(-side, up, forward)
+  hands[1].position.set(side, up, forward)
+  face.position.set(0, rig.head.at[1], rig.face.radius)
+  const parts = [head, torso, ...hands, face]
+  // Named so a test can reach a part without counting children.
+  for (const [part, name] of [[head, 'head'], [torso, 'torso'], [hands[0], 'left'], [hands[1], 'right'], [face, 'face']] as [Mesh, string][]) part.name = name
+  group.add(...parts)
+  return { group, head, hands, face, parts }
+}
+
+type Shapes = { head: BoxGeometry; torso: BoxGeometry; hand: BoxGeometry; face: PlaneGeometry; marker: PlaneGeometry }
+
 export function makeStage(world: Object3D, scene: Scene, context: AudioContext | null): Stage {
-  const { height, width } = figureSize(scene)
-  const geometry = new PlaneGeometry(width, height)
-  const marker = new PlaneGeometry(height * 0.2, height * 0.2)
+  const { height } = figureSize(scene)
+  const rig = rigParts(scene)
+  const shapes: Shapes = {
+    head: new BoxGeometry(...rig.head.size),
+    torso: new BoxGeometry(...rig.torso.size),
+    hand: new BoxGeometry(...rig.hand.size),
+    face: new PlaneGeometry(rig.face.size, rig.face.size),
+    marker: new PlaneGeometry(height * 0.2, height * 0.2),
+  }
   const range = rangeFor(scene)
   const figures = new Map<string, Figure>()
   const markers = new Map<string, Mesh>()
+  const spot = new Vector3()
   // Who is drawn, paired with what draws them, so the frame loop never looks anybody up.
   let drawn: { peer: Peer; figure: Figure }[] = []
+  let last: number | null = null
+
+  // How far a person has walked, and how fast. Read before the figure is moved, against where it still is.
+  const travelled = (figure: Figure, x: number, z: number, elapsed: number) => {
+    if (elapsed <= 0) return
+    const step = Math.hypot(x - figure.group.position.x, z - figure.group.position.z)
+    figure.walked += step
+    figure.pace += (step / (elapsed / 1000) - figure.pace) * clamp01(elapsed / PACE_SMOOTH_MS)
+  }
+
+  const swing = (figure: Figure, now: number) => {
+    const { left, right } = handSwing(figure.walked, figure.pace, now, height)
+    const [side, up, forward] = rig.hand.at
+    figure.hands[0].position.set(-side, up + left.y, forward + left.z)
+    figure.hands[1].position.set(side, up + right.y, forward + right.z)
+  }
 
   const add = (peer: Peer): Figure => {
     const material = new MeshBasicMaterial({ color: peer.member.color, transparent: true })
-    const mesh = new Mesh(geometry, material)
-    world.add(mesh)
-    const figure: Figure = { mesh, material, video: null, texture: null, voice: null, pose: { x: 0, y: 0, z: 0, yaw: 0 } }
+    const faceMaterial = new MeshBasicMaterial({ color: peer.member.color, transparent: true })
+    const body = bodyFrom(shapes, rig, material, faceMaterial)
+    world.add(body.group)
+    const figure: Figure = { ...body, material, faceMaterial, video: null, texture: null, voice: null,
+      pose: { x: 0, y: 0, z: 0, yaw: 0 }, walked: 0, pace: 0 }
     figures.set(peer.member.id, figure)
     return figure
   }
@@ -93,14 +148,14 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
   const show = (figure: Figure, stream: MediaStream) => {
     figure.video = playing(stream)
     figure.texture = new VideoTexture(figure.video)
-    figure.material.map = figure.texture
-    figure.material.color.set('#ffffff')
-    figure.material.needsUpdate = true
+    figure.faceMaterial.map = figure.texture
+    figure.faceMaterial.color.set('#ffffff')
+    figure.faceMaterial.needsUpdate = true
     if (context) figure.voice = voiceFor(context, stream)
   }
 
   const mark = (note: Note): Mesh => {
-    const mesh = new Mesh(marker, new MeshBasicMaterial({ color: MARKED[note.kind] }))
+    const mesh = new Mesh(shapes.marker, new MeshBasicMaterial({ color: MARKED[note.kind] }))
     mesh.position.set(note.spot.x, note.spot.y, note.spot.z)
     world.add(mesh)
     markers.set(note.id, mesh)
@@ -114,8 +169,9 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
   }
 
   const remove = (id: string, figure: Figure) => {
-    world.remove(figure.mesh)
+    world.remove(figure.group)
     figure.material.dispose()
+    figure.faceMaterial.dispose()
     figure.texture?.dispose()
     if (figure.video) figure.video.srcObject = null
     figure.voice?.panner.disconnect()
@@ -141,12 +197,21 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
     },
 
     update(camera, now) {
+      const elapsed = last === null ? 0 : Math.max(0, now - last)
+      last = now
       for (const { peer, figure } of drawn) {
         if (peer.motion) figure.pose = poseAt(peer.motion, now)
         const { x, y, z } = standing(figure.pose, scene)
-        figure.mesh.position.set(x, y + height / 2, z)
-        figure.mesh.rotation.set(0, billboardYaw({ x, z }, camera.position), 0)
-        if (context && figure.voice) hear(figure.voice, figure.mesh.position, camera.position.distanceTo(figure.mesh.position), range, context)
+        travelled(figure, x, z, elapsed)
+        figure.group.position.set(x, y, z)
+        figure.group.rotation.set(0, figure.pose.yaw, 0)
+        const turned = facePlacement(figure.pose.yaw, billboardYaw({ x, z }, camera.position), rig.face.radius)
+        figure.face.position.set(turned.x, rig.head.at[1], turned.z)
+        figure.face.rotation.set(0, turned.yaw, 0)
+        swing(figure, now)
+        // The head sits on the group's own line, so its place in the world needs no matrix.
+        spot.set(x, y + rig.head.at[1], z)
+        if (context && figure.voice) hear(figure.voice, spot, camera.position.distanceTo(spot), range, context)
       }
       // A marker stays where it was left and turns to face whoever is looking, as a figure does.
       for (const mesh of markers.values()) {
@@ -158,7 +223,7 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
     pick(pointer, camera) {
       const caster = new Raycaster()
       caster.setFromCamera(pointer, camera)
-      const meshes = [...[...figures].map(([id, figure]) => ({ kind: 'peer' as const, id, mesh: figure.mesh })),
+      const meshes = [...[...figures].flatMap(([id, figure]) => figure.parts.map((mesh) => ({ kind: 'peer' as const, id, mesh }))),
         ...[...markers].map(([id, mesh]) => ({ kind: 'note' as const, id, mesh }))]
       // A press can land between frames, and a raycast reads the world matrix the last frame left behind.
       for (const one of meshes) one.mesh.updateWorldMatrix(true, false)
@@ -170,8 +235,7 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
     dispose() {
       for (const [id, figure] of [...figures]) remove(id, figure)
       for (const [id, mesh] of [...markers]) unmark(id, mesh)
-      geometry.dispose()
-      marker.dispose()
+      for (const shape of Object.values(shapes)) shape.dispose()
     },
   }
 }

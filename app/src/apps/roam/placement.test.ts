@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { anchorAt, billboardYaw, figureSize, floorHeight, PHONE_HEIGHT_M, sceneExtent, standing, toScanPose, unitsPerMetre } from './placement'
+import { anchorAt, billboardYaw, facePlacement, figureSize, floorHeight, handSwing, PHONE_HEIGHT_M, rigParts, sceneExtent, standing, toScanPose, unitsPerMetre } from './placement'
 import { parseScene, type Scene } from './scene'
 
 // The real scan, so the scale these numbers carry is the one the demo runs on.
@@ -38,6 +38,62 @@ it('takes the scale from the height the scan was filmed at', () => {
   // The real scan: the figure is as tall as the camera was high.
   expect(figureSize(scene).height).toBeCloseTo(unitsPerMetre(scene) * PHONE_HEIGHT_M, 6)
   expect(figureSize(scene).width).toBeLessThan(figureSize(scene).height)
+})
+
+it('builds a body no taller and no wider than the one figure it replaces', () => {
+  const { height, width } = figureSize(scene)
+  const rig = rigParts(scene)
+  // The top of the head is the whole figure's height.
+  expect(rig.head.at[1] + rig.head.size[1] / 2).toBeCloseTo(height)
+  expect(rig.torso.size[0]).toBeCloseTo(width)
+  // A hand sits outside the torso and inside the figure's own reach, and off the floor.
+  expect(rig.hand.at[0]).toBeGreaterThan(width / 2)
+  expect(rig.hand.at[0] + rig.hand.size[0] / 2).toBeLessThan(height / 2)
+  expect(rig.hand.at[1] - rig.hand.size[1] / 2).toBeGreaterThan(0)
+  // The face clears the head cube from every angle: past its half-diagonal.
+  expect(rig.face.radius).toBeGreaterThan((rig.head.size[0] * Math.SQRT2) / 2 - rig.head.size[0] / 2)
+  expect(rig.face.size).toBeLessThan(rig.head.size[0] * 1.2)
+})
+
+it('turns a face to the viewer whichever way its body is turned', () => {
+  const radius = 2
+  // Body and viewer aligned: the face sits straight out in front.
+  expect(facePlacement(0, 0, radius)).toMatchObject({ yaw: 0 })
+  expect(facePlacement(0, 0, radius).z).toBeCloseTo(radius)
+  expect(facePlacement(0, 0, radius).x).toBeCloseTo(0)
+  // Body turned a quarter away: the face turns the same quarter back, onto the body's own side.
+  const aside = facePlacement(Math.PI / 2, 0, radius)
+  expect(aside.yaw).toBeCloseTo(-Math.PI / 2)
+  expect(aside.x).toBeCloseTo(-radius)
+  expect(aside.z).toBeCloseTo(0)
+  // However it is turned, the face stays exactly its radius from the head's middle.
+  for (const [body, viewer] of [[1, 2], [-3, 0.5], [0.2, -2.7]]) {
+    const { x, z } = facePlacement(body, viewer, radius)
+    expect(Math.hypot(x, z)).toBeCloseTo(radius)
+  }
+})
+
+it('swings the hands on the distance walked, and stills them at rest', () => {
+  const height = 1
+  // Standing still: a drift and nothing more, and the two hands mirror each other.
+  const still = handSwing(0, 0, 1414, height)
+  expect(still.left.z).toBeCloseTo(-still.right.z)
+  expect(Math.abs(still.left.z)).toBeGreaterThan(0)
+  expect(Math.abs(still.left.z)).toBeLessThan(height * 0.01)
+  expect(still.left.y).toBeCloseTo(0)
+
+  // Walking: a quarter stride in, one hand is forward and the other back.
+  const walking = handSwing(height * 0.45 / 2, height, 0, height)
+  expect(walking.left.z).toBeGreaterThan(height * 0.05)
+  expect(walking.right.z).toBeLessThan(-height * 0.05)
+  expect(walking.left.y).toBeGreaterThan(0)
+
+  // The swing repeats: two strides on is the same place in the swing.
+  const again = handSwing(height * 0.45 / 2 + height * 1.8, height, 0, height)
+  expect(again.left.z).toBeCloseTo(walking.left.z)
+
+  // A faster walk does not reach further than a full swing.
+  expect(Math.abs(handSwing(height * 0.45 / 2, height * 50, 0, height).left.z)).toBeCloseTo(Math.abs(walking.left.z))
 })
 
 it('measures the room across its widest floor span', () => {

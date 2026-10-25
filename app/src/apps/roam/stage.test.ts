@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { Mesh, Object3D, PerspectiveCamera, Vector2, Vector3 } from 'three'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Member } from './messages'
-import { figureSize, floorHeight } from './placement'
+import { figureSize, floorHeight, rigParts } from './placement'
 import type { Peer } from './presence'
 import { nextMotion, SEND_INTERVAL_MS } from './pose-feed'
 import { parseScene } from './scene'
@@ -44,6 +44,9 @@ const camera = (at: [number, number, number]) => {
   return one
 }
 
+/** One named part of a body, so a test says which part it means. */
+const part = (figure: Object3D, name: string): Mesh => figure.children.find((one) => one.name === name) as Mesh
+
 afterEach(() => vi.unstubAllGlobals())
 
 it('draws a figure for each person and takes it away when they leave', () => {
@@ -60,25 +63,78 @@ it('draws a figure for each person and takes it away when they leave', () => {
   expect(world.children).toHaveLength(0)
 })
 
-it('stands a figure on the floor, facing the viewer, and moves it as its positions arrive', () => {
+it('stands a body on the floor and moves it as its positions arrive', () => {
   const world = new Object3D()
   const stage = makeStage(world, scene, null)
   const at = { x: 1, y: 9, z: 2 }
   stage.sync([peer('a1', at)])
   stage.update(camera([1, 0, 8]), 1000)
   const figure = world.children[0]
-  const { height } = figureSize(scene)
-  // Feet on the floor, whatever height the person reported.
-  expect(figure.position.y).toBeCloseTo(floorHeight(scene) + height / 2)
+  const rig = rigParts(scene)
+  // The body's own origin is on the floor, whatever height the person reported, and its parts stand on it.
+  expect(figure.position.y).toBeCloseTo(floorHeight(scene))
   expect([figure.position.x, figure.position.z]).toEqual([1, 2])
-  // Facing a viewer standing further along +z.
-  expect(figure.rotation.y).toBeCloseTo(0)
-  expect(figure.rotation.x).toBe(0)
+  expect(part(figure, 'head').position.y).toBeCloseTo(rig.head.at[1])
+  expect(part(figure, 'torso').position.y).toBeCloseTo(rig.torso.at[1])
+  // A hand on each side, the same distance out.
+  expect(part(figure, 'left').position.x).toBeCloseTo(-part(figure, 'right').position.x)
+  // The top of the head reaches the height one figure had.
+  expect(rig.head.at[1] + rig.head.size[1] / 2).toBeCloseTo(figureSize(scene).height)
 
   const moved: Peer = { ...peer('a1', at), motion: nextMotion(null, { x: 5, y: 0, z: 2, yaw: 0 }, 2000) }
   stage.sync([moved])
   stage.update(camera([1, 0, 8]), 2000 + SEND_INTERVAL_MS)
   expect(world.children[0].position.x).toBeCloseTo(5)
+})
+
+it('turns the body the way its person faces and the face toward whoever is looking', () => {
+  const world = new Object3D()
+  const stage = makeStage(world, scene, null)
+  const looking: Peer = { member: member('a1'), motion: nextMotion(null, { x: 0, y: 0, z: 0, yaw: Math.PI / 2 }, 1000), stream: null }
+  stage.sync([looking])
+  stage.update(camera([0, 0, 5]), 1000)
+  const figure = world.children[0]
+  // The body holds its own facing, a quarter turn from the viewer standing along +z.
+  expect(figure.rotation.y).toBeCloseTo(Math.PI / 2)
+  // The face makes that quarter turn back, so it ends up square to the viewer.
+  const face = part(figure, 'face')
+  expect(face.rotation.y).toBeCloseTo(-Math.PI / 2)
+  expect(face.position.z).toBeCloseTo(0)
+  expect(face.position.x).toBeCloseTo(-rigParts(scene).face.radius)
+  // Clear of the head from every angle: the face never sits inside the cube.
+  const { radius } = rigParts(scene).face
+  expect(radius).toBeGreaterThan(rigParts(scene).head.size[0] / 2)
+})
+
+it('swings the hands while a person walks and settles them when they stop', () => {
+  const world = new Object3D()
+  const stage = makeStage(world, scene, null)
+  const { height } = figureSize(scene)
+  const walking = (to: number, at: number): Peer =>
+    ({ member: member('a1'), motion: nextMotion(null, { x: to, y: 0, z: 0, yaw: 0 }, at), stream: null })
+  stage.sync([walking(0, 0)])
+  stage.update(camera([0, 0, 5]), 0)
+  const figure = world.children[0]
+  const reach = () => Math.abs(part(figure, 'left').position.z - part(figure, 'right').position.z)
+
+  // Half a stride in a tenth of a second: a walking pace. The widest the hands get over the walk.
+  let widest = 0
+  for (let step = 1; step <= 8; step += 1) {
+    stage.sync([walking(step * height * 0.45, step * 100)])
+    stage.update(camera([0, 0, 5]), step * 100)
+    widest = Math.max(widest, reach())
+  }
+  expect(widest).toBeGreaterThan(height * 0.1)
+  // One hand forward is the other hand back, measured from where a hand rests.
+  const rest = rigParts(scene).hand.at[2]
+  expect(part(figure, 'left').position.z - rest).toBeCloseTo(rest - part(figure, 'right').position.z)
+
+  // Standing still: the same position reported for a second.
+  for (let step = 9; step <= 20; step += 1) {
+    stage.sync([walking(8 * height * 0.45, step * 100)])
+    stage.update(camera([0, 0, 5]), step * 100)
+  }
+  expect(reach()).toBeLessThan(widest / 4)
 })
 
 it('leaves a figure where it was until its person says otherwise', () => {
@@ -96,11 +152,14 @@ it("shows a person's video on their figure once it arrives, and only once", () =
   const stage = makeStage(world, scene, sound.context)
   const theirs = stream()
   stage.sync([peer('a1', { x: 0, y: 0, z: 0 })])
-  const figure = world.children[0] as Mesh
-  expect((figure.material as { map: unknown }).map).toBeNull()
+  const face = part(world.children[0], 'face')
+  const head = part(world.children[0], 'head')
+  expect((face.material as { map: unknown }).map).toBeNull()
 
   stage.sync([peer('a1', { x: 0, y: 0, z: 0 }, theirs)])
-  expect((figure.material as { map: unknown }).map).not.toBeNull()
+  // The video lands on the face alone: the rest of the body stays the person's own colour.
+  expect((face.material as { map: unknown }).map).not.toBeNull()
+  expect((head.material as { map: unknown }).map).toBeNull()
   expect(sound.context.createMediaStreamSource).toHaveBeenCalledTimes(1)
   stage.sync([peer('a1', { x: 0, y: 0, z: 0 }, theirs)])
   expect(sound.context.createMediaStreamSource).toHaveBeenCalledTimes(1)
@@ -163,6 +222,14 @@ it('picks the person the pointer is on, and nobody where there is nobody', () =>
   stage.update(viewer, 1000)
   expect(stage.pick(new Vector2(0, 0), viewer)).toEqual({ kind: 'peer', id: 'a1' })
   expect(stage.pick(new Vector2(-0.99, 0.99), viewer)).toBeNull()
+
+  // A hand is out past the torso's edge, and pressing it still names its person.
+  const rig = rigParts(scene)
+  const aside = camera([rig.hand.at[0], floorHeight(scene) + rig.hand.at[1], 3])
+  aside.lookAt(new Vector3(rig.hand.at[0], floorHeight(scene) + rig.hand.at[1], 0))
+  aside.updateMatrixWorld()
+  stage.update(aside, 1100)
+  expect(stage.pick(new Vector2(0, 0), aside)).toEqual({ kind: 'peer', id: 'a1' })
 })
 
 const note = (id: string, kind: 'text' | 'voice' | 'photo', at: { x: number; y: number; z: number }) =>

@@ -51,6 +51,7 @@ Cloudflare [does not generate a Version URL for a Worker that implements a Durab
 
 - **Exactly one side of each pair offers**, decided by comparing the two member ids, so no lock and no clash.
 - **Positions go up on a gate and are smoothed on the way in** — ten a second, interpolated between the last two — so figures glide rather than step.
+- **A person is a head, a torso and two hands**, turned to the facing they report, with their video on a face that orbits the head to stay square to the viewer. The wire carries no hands, so the swing is derived from the distance a figure actually travels until a headset can send real ones.
 - **A remote stream needs an element.** Chrome will not let Web Audio pull from a remote `MediaStream` until a hidden, muted `<audio>` element in the page is playing it.
 - **Sound waits for a gesture.** The `AudioContext` starts suspended; resume it on the first press and say *sound off* until it runs.
 
