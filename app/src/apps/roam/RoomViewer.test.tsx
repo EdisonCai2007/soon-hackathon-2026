@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { act, cleanup, render } from '@testing-library/react'
 import type { ComponentProps } from 'react'
-import { Mesh, Scene as World, Vector3, type PerspectiveCamera } from 'three'
+import { Group, Scene as World, Vector3, type PerspectiveCamera } from 'three'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { figureSize, floorHeight } from './placement'
 import { nextMotion, SEND_INTERVAL_MS } from './pose-feed'
@@ -221,13 +221,13 @@ it('draws the people in the room, follows them, and lets go of whoever leaves', 
   const { rerender, draw, renderer, onEvent } = await live({ peers: [peer('a1', { x: 1, y: 0, z: 2 })] })
   draw(0)
   const world = renderer.render.mock.calls[0][0] as World
-  // The scan's own mesh plus one figure.
-  const figures = world.children.filter((child) => child instanceof Mesh)
+  // The scan's own mesh plus one body.
+  const figures = world.children.filter((child) => child instanceof Group)
   expect(figures).toHaveLength(1)
   expect(figures[0].position.x).toBe(1)
 
   rerender(<RoomViewer {...props} onEvent={onEvent} peers={[]} />)
-  expect(world.children.filter((child) => child instanceof Mesh)).toHaveLength(0)
+  expect(world.children.filter((child) => child instanceof Group)).toHaveLength(0)
 })
 
 it('tells the page where this person stands, ten times a second and no more', async () => {

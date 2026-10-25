@@ -1,6 +1,7 @@
 // Where a person stands in the scan. The scan's units are not metres and no file says what they are, so
 // one constant carries the scale and everything else is derived from it: openspec design, "the scan's units".
 import type { Pose } from './messages'
+import { clamp01 } from './pose-feed'
 import type { Scene } from './scene'
 
 /** How high above the floor a phone is held while filming. The one number the scale rests on. */
@@ -35,6 +36,52 @@ export const unitsPerMetre = (scene: Scene): number => eyeHeight(scene) / PHONE_
 export const figureSize = (scene: Scene): { height: number; width: number } => {
   const height = eyeHeight(scene)
   return { height, width: height * 0.38 }
+}
+
+type Part = { size: [number, number, number]; at: [number, number, number] }
+export type Rig = { head: Part; torso: Part; hand: Part; face: { size: number; radius: number } }
+
+/** The body's parts, every number a fraction of the figure's own height, measured up from the floor. */
+export function rigParts(scene: Scene): Rig {
+  const { height: h, width } = figureSize(scene)
+  const head = h * 0.26
+  return {
+    head: { size: [head, head, head], at: [0, h * 0.87, 0] },
+    torso: { size: [width, h * 0.34, h * 0.22], at: [0, h * 0.57, 0] },
+    hand: { size: [h * 0.11, h * 0.11, h * 0.11], at: [h * 0.27, h * 0.5, h * 0.06] },
+    // Clear of the head cube's half-diagonal (0.26 × √2 ⁄ 2 ≈ 0.184), so a turning face never cuts into it.
+    face: { size: h * 0.24, radius: h * 0.19 },
+  }
+}
+
+/** The face, on its circle about the head: turned to the viewer however the body is turned. */
+export const facePlacement = (bodyYaw: number, viewerYaw: number, radius: number): { yaw: number; x: number; z: number } => {
+  const yaw = viewerYaw - bodyYaw
+  return { yaw, x: Math.sin(yaw) * radius, z: Math.cos(yaw) * radius }
+}
+
+/** One swing per step, a step being a little under the figure's own height. */
+const STRIDE = 0.9
+/** The pace, in figure heights a second, at which the arms are swinging their fullest. */
+const PACE_FULL = 0.8
+const REACH = 0.12
+const LIFT = 0.02
+const DRIFT = 0.004
+
+export type Swing = { z: number; y: number }
+
+/** How far each hand has swung: by the distance walked, not the clock, so a person standing still is still. */
+export function handSwing(walked: number, pace: number, now: number, height: number): { left: Swing; right: Swing } {
+  const phase = (Math.PI * walked) / (STRIDE * height)
+  const amplitude = clamp01(pace / (PACE_FULL * height))
+  const swung = Math.sin(phase) * amplitude
+  // Hands are never quite still: a little drift keeps a standing person from reading as a frozen page.
+  const drift = Math.sin(now / 900) * DRIFT * height
+  const lift = Math.abs(swung) * LIFT * height
+  return {
+    left: { z: swung * REACH * height + drift, y: lift },
+    right: { z: -swung * REACH * height - drift, y: lift },
+  }
 }
 
 export const sceneExtent = ({ bounds: [low, high] }: Scene): number => Math.max(high[0] - low[0], high[2] - low[2])
