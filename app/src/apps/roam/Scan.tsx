@@ -11,8 +11,6 @@ import type { Peer } from './presence'
 import { RoomViewer } from './RoomViewer'
 import type { Pose, Scene, View } from './scene'
 import { card, Halftone, Screen, title } from './Screen'
-import { toolsOn } from './invite'
-import { Counts, Placing } from './Tools'
 import { useRoomAr, type RoomAr } from './use-room-ar'
 import { initialViewer, viewerReducer, type ViewerEvent, type ViewerState } from './viewer-state'
 import { Watch } from './Watch'
@@ -77,15 +75,14 @@ function WhosIn({ live, open, toggle }: { live: Live; open: boolean; toggle: () 
   </Pill>
 }
 
-type BarProps = { app: string; tools: boolean; ready: Ready; live?: Live; act: Act; box: HTMLElement | null; walk: RoomAr; stance: Stance | null }
+type BarProps = { ready: Ready; live?: Live; act: Act; box: HTMLElement | null; walk: RoomAr; stance: Stance | null }
 
 /** The top of the room: the name at the left, the views and who's in mid, the body, sound and full screen right. */
-function Bar({ app, tools, ready, live, act, box, walk, stance }: BarProps) {
+function Bar({ ready, live, act, box, walk, stance }: BarProps) {
   const [open, setOpen] = useState(false)
   return <>
     <div className="absolute top-6 left-6 z-20 grid justify-items-start gap-3">
       <h1><Wordmark className="h-8" /><span className="sr-only">ROAM</span></h1>
-      {tools && ready && <Counts app={app} scene={ready.scene} />}
     </div>
     <div className="absolute top-6 left-1/2 z-20 flex -translate-x-1/2 items-start gap-3 max-md:top-24">
       <Joined className={ready ? undefined : 'opacity-40'}>
@@ -122,17 +119,16 @@ type ViewProps = {
   onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
   stance: Stance | null
   onStance: (stance: Stance) => void
-  onWhere?: (pose: Pose) => void
   paused: boolean
 }
 
 /** The scan itself, with the techniques running over it and where this person's own view stands. */
-function View({ app, live, scene, pose, act, onPick, stance, onStance, onWhere, paused }: ViewProps) {
+function View({ app, live, scene, pose, act, onPick, stance, onStance, paused }: ViewProps) {
   const casts = useCasts(live?.peers, live?.casting.mine, stance)
   useTechniqueSounds(live?.audio, casts, scene, stance)
   return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
     peers={live?.peers} audio={live?.audio} casts={casts} onPick={onPick} onStance={onStance}
-    onWhere={onWhere} paused={paused} />
+    paused={paused} />
 }
 
 /** The scanned room filling the screen: walked alone, or shared with whoever a live room holds. */
@@ -141,8 +137,6 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
   const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [watching, setWatching] = useState<{ id: string; saved: Pose } | null>(null)
   const [stance, setStance] = useState<Stance | null>(null)
-  const [where, setWhere] = useState<Pose | null>(null)
-  const tools = toolsOn()
   const ready = state.status === 'ready' ? state : null
   const watched = live?.peers.find((peer) => peer.member.id === watching?.id) ?? null
   const stopped = state.status === 'error' || state.status === 'no-webgl'
@@ -163,12 +157,11 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
             if (!walk.acceptsView(here)) return
             setStance(here)
             tell?.(here)
-          }} onWhere={tools ? setWhere : undefined}
+          }}
           onPick={(id, saved) => { if (live) setWatching({ id, saved }) }} />}
       {state.status === 'loading' && <Gathering progress={state.progress} />}
-      <Bar app={app} tools={tools} ready={ready} live={live} act={dispatch} box={box} walk={walk} stance={stance} />
+      <Bar ready={ready} live={live} act={dispatch} box={box} walk={walk} stance={stance} />
       <div className="absolute inset-x-6 bottom-6 z-20 flex flex-wrap items-end justify-between gap-3">
-        {tools && <Placing ready={ready} where={where} go={(view) => { if (!walk.walking) dispatch({ type: 'go', view }) }} />}
         <div className="grid gap-1 text-sm font-medium text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
           {walk.trouble && <p role="alert">{walk.trouble}</p>}
           <p>Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster</p>

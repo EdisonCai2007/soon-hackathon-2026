@@ -180,22 +180,21 @@ it('shows progress and paused tracking with recenter disabled', async () => {
   expect((screen.getByRole('button', { name: 'Carry on from here' }) as HTMLButtonElement).disabled).toBe(true)
 })
 
-it('keeps the existing camera tools but ignores their jumps until the walk ends', async () => {
-  vi.stubGlobal('location', { search: '?tools' })
+it('keeps the existing view presets but ignores their jumps until the walk ends', async () => {
   walked.supported = true
   await open()
   ready()
   stand()
   const initial = viewer.props!.pose
-  fireEvent.change(screen.getByLabelText('Camera'), { target: { value: '1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
   const chosen = viewer.props!.pose
   expect(chosen).not.toEqual(initial)
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Walk it' })) })
   expect((screen.getByRole('button', { name: 'Room view' }) as HTMLButtonElement).disabled).toBe(true)
-  fireEvent.change(screen.getByLabelText('Camera'), { target: { value: '2' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Top view' }))
   expect(viewer.props!.pose).toEqual(chosen)
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stop' })) })
   const returned = viewer.props!.pose
-  fireEvent.change(screen.getByLabelText('Camera'), { target: { value: '2' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Top view' }))
   expect(viewer.props!.pose).not.toEqual(returned)
 })
