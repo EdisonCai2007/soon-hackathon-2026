@@ -1,6 +1,6 @@
 # Take notes out of ROAM
 
-**Status:** shipped — archived.
+**Status:** ready-to-ship
 **Branch:** remove-notes
 **Open questions:** none
 
@@ -100,3 +100,4 @@ None.
 - **2026-10-25** — Asked whether to publish this branch, which also carries the unfinished `roam-ar-view` and `roam-gestures` work → chose shipping all of it on purpose.
 - **2026-10-25** — Checked on staging: `GET /apps/roam/api/notes` answers 404 and `/apps/roam/leave` loads. The Android walk needs the owner in the home, and `roam-ar-view` task 13.4 already walks this screen from the phone, so it is left to that task rather than held here.
 - **2026-10-25** — Archived on `remove-notes` to publish, carrying the unfinished `roam-ar-view` and `roam-gestures` work with it on purpose.
+- **2026-10-25** — Brought in `main` to publish: `RoomViewer.tsx`, `Scan.tsx` and `stage.ts` clashed with the filmed people and the position line; kept both sides, with the walk's matrix update in `pick`.
