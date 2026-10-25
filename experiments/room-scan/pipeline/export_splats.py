@@ -30,7 +30,7 @@ bound=np.quantile(viewer,[.005,.995],axis=0)
 poses=raw['camera_poses'][0]
 camera_views=[]
 sources=raw['sources'] if 'sources' in raw else np.zeros(len(poses),int)
-NAMES=['Video','New video','Bedroom video','Stairs video','Hallway video','Lobby video'];seen={}
+NAMES=['Video','New video','Bedroom video','Stairs video','Hallway video','Lobby video','Lobby night video'];seen={}
 def label(i):
     # Names are the viewer's keys: number a repeated frame instead of reusing its name.
     n=f'{NAMES[sources[i]] if sources[i]<len(NAMES) else f"Video {sources[i]+1}"} {round(float(raw["times"][i]),1):g}s'

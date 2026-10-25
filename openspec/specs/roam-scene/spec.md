@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change roam-scan-on-site. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Scan renders on the site
 The ROAM app at `/apps/roam/` SHALL load the compressed Gaussian-splat room scan from the site's own static assets, with no external CDN, and render it oriented by the scene metadata's rotation and translation.
 
@@ -94,3 +96,55 @@ The scan SHALL include the upstairs rooms and the floor below, joined by the sta
 #### Scenario: A guest downstairs
 - **WHEN** a guest in a shared room stands on the lower floor
 - **THEN** their figure stands on the lower floor at the same size as a figure upstairs
+
+### Requirement: Where the camera is
+The viewer SHALL show the camera's current position and facing direction in the scan's viewer coordinates, the same coordinates as the source-video cameras, kept current while the person moves, and SHALL offer an action that copies them as text.
+
+#### Scenario: Copy a position
+- **WHEN** the person walks to a spot, then chooses Copy
+- **THEN** the clipboard holds that spot's position and facing, and jumping to the copied spot from them shows the same view
+
+#### Scenario: Before the room loads
+- **WHEN** the scan has not finished loading
+- **THEN** no position is shown and Copy is unavailable
+
+### Requirement: The lobby is whole
+The ground floor SHALL include the whole lobby, the party room behind the stairs as well as the living room, with its walls, ceiling and floor shown without gaps and without the colour of the party lights it was filmed under. Adding the party room SHALL leave the living room, hallway and stairs as they were.
+
+#### Scenario: Walk into the party room
+- **WHEN** the person picks a *Lobby night video* camera from the camera choice
+- **THEN** the camera stands in the party room, its walls read white, and the floor runs unbroken under the tables and chairs
+
+#### Scenario: The living room is untouched
+- **WHEN** the person picks a *Lobby video* camera in the living room
+- **THEN** the living room looks as it did before the party room was added
+
+### Requirement: Filmed people play in the scan
+The scan SHALL show Edison's animated clips of people, each at its chosen place: two on the living-room couch, two in front of the living-room fireplace, two seated by the white desk under the stairs, and one man doing jumping jacks in the old bedroom upstairs. Each person SHALL stand or sit on the floor under them at the scan's scale, near the spot and facing Edison chose, every clip SHALL replay without end, and every clip SHALL be present whichever camera the person picks. The models' eyes SHALL show iris and pupil. A clip that fails to load SHALL leave the scan as it was.
+
+#### Scenario: Watch the couch
+- **WHEN** the person looks at the living-room couch
+- **THEN** both people are there, moving, and the clip starts again each time it ends
+
+#### Scenario: Walk past the fireplace and the desk
+- **WHEN** the person walks from the stairs past the white desk into the living room
+- **THEN** the seated pair is by the desk and the standing pair is in front of the fireplace, both moving
+
+#### Scenario: Open the page
+- **WHEN** the page opens on its first camera, in the old bedroom
+- **THEN** the man doing jumping jacks is in view beside the bed, moving
+
+#### Scenario: Look someone in the eye
+- **WHEN** the person stands close to a model's face
+- **THEN** its eyes show a coloured iris with a dark pupil, not a blank white
+
+#### Scenario: The clip fails to load
+- **WHEN** the people model cannot be fetched
+- **THEN** the room still loads and can be walked
+
+### Requirement: Filmed people stay whole up close
+Every part of a filmed person SHALL be drawn whenever it is in view, however far the person's animation has moved them from where their clip starts.
+
+#### Scenario: Walk up to a face
+- **WHEN** the person stands close to a model's face after the model has walked away from its starting spot
+- **THEN** its hair, eyes, eyebrows and mouth are all drawn

@@ -41,7 +41,7 @@ it('takes the scale from the height the scan was filmed at', () => {
 })
 
 it('measures the room across its widest floor span', () => {
-  expect(sceneExtent(scene)).toBeCloseTo(14.059, 2)
+  expect(sceneExtent(scene)).toBeCloseTo(15.845, 2)
 })
 
 it("takes the taped spot from one of the scan's own cameras", () => {
@@ -51,7 +51,7 @@ it("takes the taped spot from one of the scan's own cameras", () => {
   expect(anchor.yaw).toBeCloseTo(0)
   expect(anchorAt(made([camera([0, 1.5, 0], [3, 1.5, 0])]), 0).yaw).toBeCloseTo(Math.PI / 2)
   // An index outside the list is pulled back to one that exists.
-  expect(anchorAt(scene, 999)).toEqual(anchorAt(scene, scene.cameras.length - 1))
+  expect(anchorAt(scene, scene.cameras.length + 5)).toEqual(anchorAt(scene, scene.cameras.length - 1))
   expect(anchorAt(scene, -3)).toEqual(anchorAt(scene, 0))
 })
 

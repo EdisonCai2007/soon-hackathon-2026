@@ -24,9 +24,9 @@ const box: Scene = {
 
 it('reads the shipped scan details', () => {
   const scene = parseScene(shipped)
-  expect(scene.splats).toBe(546977)
-  expect(scene.views).toBe(665)
-  expect(scene.cameras).toHaveLength(665)
+  expect(scene.splats).toBe(757543)
+  expect(scene.views).toBe(1199)
+  expect(scene.cameras).toHaveLength(1199)
   expect(scene.floors).toEqual([-3.95, -1.3])
 })
 

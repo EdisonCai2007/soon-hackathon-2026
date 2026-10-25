@@ -7,6 +7,7 @@ import { PovControls } from './pov-controls'
 import { applyPose, cameraPose, loadScene, type Pose } from './scene'
 import { loadSplats } from './splat-scene'
 import { dueToSend } from './pose-feed'
+import { addPeople, type People } from './people'
 import { makeStage, pointerAt, stanceOf, type Stage } from './stage'
 import { ThumbPad } from './ThumbPad'
 import { STILL, type Push } from './thumb-pad'
@@ -30,6 +31,8 @@ type Props = {
   onStance?: (stance: Stance) => void
   /** The techniques running right now, drawn where whoever cast them stands. */
   casts?: readonly Cast[]
+  /** Where the camera is and faces, ten times a second, for the page to show. */
+  onWhere?: (pose: Pose) => void
 }
 
 // Three.js r180 draws with WebGL 2 alone, so a browser without it gets a plain message, not a blank box.
@@ -37,7 +40,7 @@ const hasWebGL = () => document.createElement('canvas').getContext('webgl2') !==
 
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
-export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance,
+export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance, onWhere,
   casts = [] }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const wash = useRef<HTMLDivElement>(null)
@@ -46,8 +49,8 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
   const [touched, setTouched] = useState(false)
   const push = useRef<Push>(STILL)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, onPick, onStance, casts })
-  useEffect(() => { latest.current = { peers, onPick, onStance, casts } })
+  const latest = useRef({ peers, onPick, onStance, casts, onWhere })
+  useEffect(() => { latest.current = { peers, onPick, onStance, casts, onWhere } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -105,6 +108,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
     }
     renderer.domElement.addEventListener('click', picked)
     let splats: SplatMesh | undefined
+    let people: People | undefined
 
     void (async () => {
       const scene = await loadScene(sceneUrl)
@@ -123,21 +127,29 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       const stage = makeStage(world, scene, audio)
       const spells = makeCastStage(world, scene)
       stage.sync(latest.current.peers)
+      // The filmed people arrive after the room: a model that fails to load leaves the scan as it was.
+      void addPeople(world, scene).then((loaded) => {
+        if (stopped) loaded.dispose()
+        else people = loaded
+      }, (error: unknown) => console.error(error))
       let previous: number | null = null
       let told: number | null = null
       const watch = watchDetail(detailed)
       renderer.setAnimationLoop((time) => {
         watch.frame(time)
         controls.push(push.current)
-        controls.update(previous === null ? 0 : (time - previous) / 1000)
+        const seconds = previous === null ? 0 : (time - previous) / 1000
+        controls.update(seconds)
+        people?.update(seconds)
         previous = time
         stage.update(camera, time)
         // A technique is drawn over the room's people, and its brightest moment washes the whole view.
         washing.style.opacity = String(spells.draw(latest.current.casts, time))
         // The others are told where this person stands on the same gate their figures are drawn on.
-        if (latest.current.onStance && dueToSend(told, time)) {
+        if (dueToSend(told, time)) {
           told = time
-          latest.current.onStance(stanceOf(camera))
+          latest.current.onStance?.(stanceOf(camera))
+          latest.current.onWhere?.(cameraPose(camera))
         }
         renderer.render(world, camera)
       })
@@ -153,6 +165,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       viewer.current?.stage?.dispose()
       viewer.current?.spells?.dispose()
       viewer.current = null
+      people?.dispose()
       observer.disconnect()
       renderer.domElement.removeEventListener('webglcontextlost', lost)
       renderer.domElement.removeEventListener('click', picked)

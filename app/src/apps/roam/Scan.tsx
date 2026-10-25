@@ -106,14 +106,16 @@ type ViewProps = {
   onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
   stance: Stance | null
   onStance: (stance: Stance) => void
+  onWhere: (pose: Pose) => void
 }
 
 /** The scan itself, with the techniques running over it and where this person's own view stands. */
-function View({ app, live, scene, pose, act, onPick, stance, onStance }: ViewProps) {
+function View({ app, live, scene, pose, act, onPick, stance, onStance, onWhere }: ViewProps) {
   const casts = useCasts(live?.peers, live?.casting.mine, stance)
   useTechniqueSounds(live?.audio, casts, scene, stance)
   return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
-    peers={live?.peers} audio={live?.audio} casts={casts} onPick={onPick} onStance={onStance} />
+    peers={live?.peers} audio={live?.audio} casts={casts} onPick={onPick} onStance={onStance}
+    onWhere={onWhere} />
 }
 
 /** While the walk runs, the session owns the screen, so these are the page's only visible controls. */
@@ -130,12 +132,44 @@ function Walking({ walk, overlay }: { walk: RoomAr; overlay: RefObject<HTMLDivEl
   </div>
 }
 
+// Rounding -0.0001 must read 0.000, not -0.000.
+const fixed = (value: number, places: number) => (Object.is(Math.round(value * 10 ** places), -0) ? 0 : value).toFixed(places)
+
+/** Where the camera is and faces, in the scan's own coordinates: one line to paste into a chat. */
+function whereText({ position, target }: Pose): string {
+  const facing = target.map((value, axis) => value - position[axis])
+  return `x ${fixed(position[0], 3)} y ${fixed(position[1], 3)} z ${fixed(position[2], 3)} facing ${facing.map((value) => fixed(value, 2)).join(' ')}`
+}
+
+function Where({ where }: { where: Pose | null }) {
+  // Copied until the person moves: the line then reads somewhere else.
+  const [copied, setCopied] = useState<string | null>(null)
+  const line = useRef<HTMLElement>(null)
+  if (!where) return null
+  const text = whereText(where)
+  // Some embedded browsers refuse the clipboard API; selecting the line and copying it the old way still works there.
+  const byHand = () => {
+    const range = document.createRange()
+    range.selectNodeContents(line.current!)
+    getSelection()?.removeAllRanges()
+    getSelection()?.addRange(range)
+    setCopied(document.execCommand('copy') ? text : null)
+  }
+  const copy = () => void (navigator.clipboard?.writeText(text) ?? Promise.reject(new Error('no clipboard'))).then(() => setCopied(text), byHand)
+  return <div className="mb-3 flex flex-wrap items-center gap-3">
+    <span className="text-sm text-muted-foreground">You are at</span>
+    <code ref={line} className="select-all text-sm tabular-nums" aria-label="Camera position">{text}</code>
+    <Button type="button" variant="outline" size="sm" onClick={copy}>{copied === text ? 'Copied' : 'Copy'}</Button>
+  </div>
+}
+
 /** The scanned room in the page: walked alone, or shared with whoever a live room holds. */
 export function Scan({ app, live, before }: { app: string; live?: Live; before?: ReactNode }) {
   const [state, dispatch] = useReducer(viewerReducer, initialViewer)
   const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [watching, setWatching] = useState<{ id: string; saved: Pose } | null>(null)
   const [stance, setStance] = useState<Stance | null>(null)
+  const [where, setWhere] = useState<Pose | null>(null)
   const ready = state.status === 'ready' ? state : null
   const watched = live?.peers.find((peer) => peer.member.id === watching?.id) ?? null
   const scene = ready?.scene ?? null
@@ -153,11 +187,12 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
       {before}
       {walk.trouble && <p role="alert" className="mb-3 text-sm text-muted-foreground">{walk.trouble}</p>}
       <Cameras ready={ready} act={dispatch} />
+      <Where where={ready && where} />
       {state.status === 'error' || state.status === 'no-webgl'
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
         : <div ref={setBox} className="relative h-[70vh] min-h-80 overflow-hidden rounded-xl border bg-[#10151c]">
           <View app={app} live={live} scene={scene} pose={ready?.pose ?? null} act={dispatch} stance={stance}
-            onStance={(here) => { setStance(here); tell?.(here) }}
+            onStance={(here) => { setStance(here); tell?.(here) }} onWhere={setWhere}
             onPick={(id, saved) => { if (live) setWatching({ id, saved }) }} />
           {state.status === 'loading' && <div className="absolute inset-0">
             <Loading label={loadingLabel(state.progress)} className="h-full"><Skeleton className="h-full rounded-none" /></Loading>
