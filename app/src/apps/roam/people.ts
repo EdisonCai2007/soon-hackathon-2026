@@ -39,8 +39,16 @@ const CHAIRS: Placement = {
   anchor: [-0.861, -0.282],
 }
 
+// Doing jumping jacks in the old bedroom upstairs, on Edison's spot and facing the door; he starts at the origin.
+const BEDROOM: Placement = {
+  url: '/apps/roam/bedroom.glb',
+  at: [-0.913, 0.208, -0.659],
+  facing: [0.6, -0.13, 0.79],
+  anchor: [0, 0],
+}
+
 /** Every filmed clip the scan plays. */
-export const CLIPS: readonly Placement[] = [COUCH, FIREPLACE, CHAIRS]
+export const CLIPS: readonly Placement[] = [COUCH, FIREPLACE, CHAIRS, BEDROOM]
 
 /** The turn about the vertical that points a model's +z (its people's front) along a heading. */
 export const yawFor = ([x, , z]: Vec3): number => Math.atan2(x, z)

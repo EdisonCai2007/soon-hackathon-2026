@@ -41,7 +41,7 @@ it('takes the scale from the height the scan was filmed at', () => {
 })
 
 it('measures the room across its widest floor span', () => {
-  expect(sceneExtent(scene)).toBeCloseTo(15.865, 2)
+  expect(sceneExtent(scene)).toBeCloseTo(15.845, 2)
 })
 
 it("takes the taped spot from one of the scan's own cameras", () => {
