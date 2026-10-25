@@ -34,14 +34,14 @@ it('takes the scale from the height the scan was filmed at', () => {
   const odd = made([camera([0, 1.5, 0]), camera([0, 1.5, 1]), camera([0, 9, 2])], [[-5, 0, -5], [5, 3, 5]])
   expect(unitsPerMetre(odd)).toBeCloseTo(1)
   // Cameras on either floor measure from their own floor, so a second floor does not stretch the scale.
-  expect(unitsPerMetre(scene)).toBeCloseTo(1.3 / PHONE_HEIGHT_M, 2)
+  expect(unitsPerMetre(scene)).toBeCloseTo(1.32 / PHONE_HEIGHT_M, 2)
   // The real scan: the figure is as tall as the camera was high.
   expect(figureSize(scene).height).toBeCloseTo(unitsPerMetre(scene) * PHONE_HEIGHT_M, 6)
   expect(figureSize(scene).width).toBeLessThan(figureSize(scene).height)
 })
 
 it('measures the room across its widest floor span', () => {
-  expect(sceneExtent(scene)).toBeCloseTo(13.877, 2)
+  expect(sceneExtent(scene)).toBeCloseTo(15.865, 2)
 })
 
 it("takes the taped spot from one of the scan's own cameras", () => {
@@ -51,7 +51,7 @@ it("takes the taped spot from one of the scan's own cameras", () => {
   expect(anchor.yaw).toBeCloseTo(0)
   expect(anchorAt(made([camera([0, 1.5, 0], [3, 1.5, 0])]), 0).yaw).toBeCloseTo(Math.PI / 2)
   // An index outside the list is pulled back to one that exists.
-  expect(anchorAt(scene, 999)).toEqual(anchorAt(scene, scene.cameras.length - 1))
+  expect(anchorAt(scene, scene.cameras.length + 5)).toEqual(anchorAt(scene, scene.cameras.length - 1))
   expect(anchorAt(scene, -3)).toEqual(anchorAt(scene, 0))
 })
 

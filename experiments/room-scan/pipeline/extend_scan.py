@@ -7,6 +7,7 @@ parser.add_argument('--parent',type=Path,required=True,help='Stitched reconstruc
 parser.add_argument('--parent-videos',required=True,help='Comma-separated video file names, in the parent\'s source order.')
 parser.add_argument('--chunks',type=Path,required=True,help='Folder with one reconstruct.py workdir per piece.')
 parser.add_argument('--plan',type=Path,required=True,help='JSON: chunks (name, parent: "base" or a piece), owners (video file name, from, to, chunk).')
+parser.add_argument('--spread-drift',help='Piece whose loop check sets the drift to undo: each new frame moves by that drift times its share of the walk\'s time.')
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
 plan=json.loads(args.plan.read_text());OUT=args.output.resolve();OUT.mkdir(parents=True,exist_ok=True)
@@ -48,6 +49,14 @@ def place(name):
     report[name]={'anchor':c['parent'],'shared_frames':len(shared),'residual_median':float(np.median(r)),'scale':float(s),'camera_gap_median':float(np.median(cam))}
     return T[name]
 for c in plan['chunks']:place(c['name'])
+# Loop check: a later piece that also holds frames of the parent scan, such as a walk that ends where it
+# started, shows how far the chain of fits has drifted by the time it gets back.
+for c in plan['chunks']:
+    name=c['name'];shared=[k for k in C[name]['keys'] if k in C['base']['index']]
+    if c['parent']=='base' or not shared:continue
+    here=apply(T[name],np.stack([C[name]['z']['camera_poses'][0][C[name]['index'][k],:3,3] for k in shared]))
+    there=np.stack([base['camera_poses'][0][C['base']['index'][k],:3,3] for k in shared])
+    report[name]['drift']=(there-here).mean(0).tolist();report[name]['drift_m']=float(np.linalg.norm(there-here,axis=1).mean())
 
 def owner(k):
     for o in plan['owners']:
@@ -66,6 +75,10 @@ for c in plan['chunks']:
         out['points'].append(apply(T[name],z['points'][0][i]));out['local_points'].append(s*z['local_points'][0][i]);out['conf'].append(z['conf'][0][i])
         pose=z['camera_poses'][0][i].copy();pose[:3,:3]=R@pose[:3,:3];pose[:3,3]=apply(T[name],pose[:3,3]);out['camera_poses'].append(pose)
         out['rgb'].append(z['rgb'][i]);times.append(k[1]);sources.append(allv.index(k[0]));chunk.append(name);added[name]=added.get(name,0)+1
+if args.spread_drift:
+    drift=np.array(report[args.spread_drift]['drift']);end=max(k[1] for k in C[args.spread_drift]['keys'] if k[0] not in videos)
+    for i in range(len(base['times']),len(times)):
+        shift=drift*min(times[i]/end,1);out['points'][i]=out['points'][i]+shift;out['camera_poses'][i][:3,3]+=shift
 arrays={k:np.stack(v)[None] for k,v in out.items() if k!='rgb'};arrays['rgb']=np.stack(out['rgb'])
 arrays.update(times=np.array(times),sources=np.array(sources),chunks=np.array(chunk))
 np.savez_compressed(OUT/'reconstruction.npz',**arrays)
