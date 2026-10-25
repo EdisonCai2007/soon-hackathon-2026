@@ -112,4 +112,8 @@ To fill the unscanned half of a storey that is already partly in the scan, such 
 7. **Retrain only the lower part:** reorder the PLY so splats more than 1.2 m above the floor come first, then `finetune.py --freeze-first <that count>` (4,000 steps) relearns the floor and furniture on people-only masks while walls and ceiling stay exactly as trained.
 8. **Join:** `merge_floor.py --split-below <height under the floor above>` gives each place on the storey to the scan whose cameras came nearest. New cameras passing through the old half (`--pass-gap`) claim nothing, so the old half stays byte for byte.
 
+## Clear haze ahead of chosen views
+
+`clear_views.py --view x,y,z,fx,fy,fz` (repeat; paste the viewer's *You are at* line) deletes floating splats ahead of each view, only in a slice 0.6 above and below its eye, so floors and ceilings are never touched. A splat goes when at least two training frames see past it for each one that lands on it (`--min-through 2 --ratio 1`), using `--workdir`'s per-frame depths. Opacity and density tests failed here: this scan's white walls are faint, sparse splats too, and deleting them left black holes. Haze below the slice, such as down a stairwell, needs its own view at that height.
+
 `fit_path.py` (fitting pieces to a hand-drawn floor map) and `remove_people.py` were tried and not used: a sketched map's proportions bent the hallway, and painting before training removed people better than deleting splats after.

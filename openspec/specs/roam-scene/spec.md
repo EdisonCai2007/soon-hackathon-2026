@@ -93,7 +93,7 @@ The ground floor SHALL include the whole lobby, the party room behind the stairs
 - **THEN** the living room looks as it did before the party room was added
 
 ### Requirement: Filmed people play in the scan
-The scan SHALL show Edison's animated clips of people, each pair at its chosen place on the ground floor: two on the living-room couch, two in front of the living-room fireplace, and two seated by the white desk under the stairs. Each person SHALL stand or sit on the floor under them at the scan's scale, near the spot and facing Edison chose, every clip SHALL replay without end, and every clip SHALL be present whichever camera the person picks. The models' eyes SHALL show iris and pupil. A clip that fails to load SHALL leave the scan as it was.
+The scan SHALL show Edison's animated clips of people, each at its chosen place: two on the living-room couch, two in front of the living-room fireplace, two seated by the white desk under the stairs, and one man doing jumping jacks in the old bedroom upstairs. Each person SHALL stand or sit on the floor under them at the scan's scale, near the spot and facing Edison chose, every clip SHALL replay without end, and every clip SHALL be present whichever camera the person picks. The models' eyes SHALL show iris and pupil. A clip that fails to load SHALL leave the scan as it was.
 
 #### Scenario: Watch the couch
 - **WHEN** the person looks at the living-room couch
@@ -102,6 +102,10 @@ The scan SHALL show Edison's animated clips of people, each pair at its chosen p
 #### Scenario: Walk past the fireplace and the desk
 - **WHEN** the person walks from the stairs past the white desk into the living room
 - **THEN** the seated pair is by the desk and the standing pair is in front of the fireplace, both moving
+
+#### Scenario: Open the page
+- **WHEN** the page opens on its first camera, in the old bedroom
+- **THEN** the man doing jumping jacks is in view beside the bed, moving
 
 #### Scenario: Look someone in the eye
 - **WHEN** the person stands close to a model's face
