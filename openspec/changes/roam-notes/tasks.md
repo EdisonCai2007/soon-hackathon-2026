@@ -18,7 +18,7 @@
 
 ## 3. The phone leaves a note
 
-- [ ] 3.1 Write `app/src/apps/roam/spots.ts` and its test: the marked spots as a name and a camera index each, resolved through `anchorAt`, with an index past the scene's cameras refused.
+- [x] 3.1 Write `app/src/apps/roam/spots.ts` and its test: the marked spots as a name and a camera index each, resolved through `anchorAt`, with an index past the scene's cameras refused. Four spots, named from the scan's own videos and covering both floors and each end of the stairs; task 5.2 renames them by eye once they are taped. A spot also reports which floor it is on, for a label beside its name.
 - [ ] 3.2 Extend `app/src/apps/roam/ar-session.ts` for the DOM overlay as task 1 settled it, keeping `startAr`'s current shape for the camera screen, and extend `ar-session.test.ts`.
 - [ ] 3.3 Write `app/src/apps/roam/notes.ts` (browser) and its test: fetching the list, posting a note as multipart, the author secrets kept in `localStorage`, shrinking a photo to the cap, and the pose a note is left at from the phone's own pose.
 - [ ] 3.4 Write `app/src/apps/roam/Leave.tsx` and `Leave.test.tsx`: pick a spot, walk, *Leave a note here*, the three kinds, *Leave it*, the count, *Line up again*, the refused-cap state, and the no-AR state that offers the ordinary scan — phone layout, by [the UX section](design.md#ux).
@@ -36,7 +36,7 @@
 
 - [ ] 5.1 Pace a measured distance in the real home and the same distance in the scan, set `PHONE_HEIGHT_M` in `app/src/apps/roam/placement.ts` from it, and write the measurement into the wiki. `(outward — needs the owner in the home)`
 - [ ] 5.2 Pick the marked spots by eye on the preview, name them in plain words, and tape them in the real home. `(outward — needs the owner in the home)`
-- [ ] 5.3 Write `wiki/stack/places-and-notes.md` — a lasting place beside a live room, where its bytes live and why not R2, the caps, the author secret and the keeper key, and the marked spots — and link it from `wiki/stack/README.md` and from [live rooms](../../../wiki/stack/live-rooms.md).
+- [~] 5.3 Written and linked from the stack's hub and from live rooms; what the phone check settles joins it when task 1 returns. Write `wiki/stack/places-and-notes.md` — a lasting place beside a live room, where its bytes live and why not R2, the caps, the author secret and the keeper key, and the marked spots — and link it from `wiki/stack/README.md` and from [live rooms](../../../wiki/stack/live-rooms.md).
 
 ## 6. Verification
 
