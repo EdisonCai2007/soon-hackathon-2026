@@ -62,6 +62,8 @@ it('adds every clip where it belongs and replays each without end', async () => 
   })
   // Lit once for all of them, so the models are seen at all.
   expect(world.children).toHaveLength(CLIPS.length + 2)
+  // Every part is drawn wherever the clip moves it, never culled by bounds from another pose.
+  placed.forEach((group) => group.children[0].traverse((part) => expect(part.frustumCulled).toBe(false)))
   const parts = placed.map((group) => group.children[0])
   people.update(1)
   for (const part of parts) expect(part.position.x).toBeCloseTo(1)
