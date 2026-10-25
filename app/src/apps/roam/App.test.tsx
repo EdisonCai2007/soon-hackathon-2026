@@ -52,42 +52,63 @@ const open = async (at = '/apps/roam/', answers: Record<string, unknown> = {}, a
 }
 const send = (event: Parameters<ComponentProps<typeof RoomViewer>['onEvent']>[0]) => act(() => viewer.props!.onEvent(event))
 const button = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement
-const camera = () => screen.getByLabelText('Camera') as HTMLSelectElement
 
 it('shows a placeholder while the room loads, with the views waiting for it', async () => {
   await open()
   expect(viewer.props).toMatchObject({ sceneUrl: '/apps/roam/scene.json', splatUrl: '/apps/roam/room.spz', pose: null })
   expect(screen.getByRole('status').textContent).toBe('Loading the room…')
   for (const name of ['Room view', 'Overview', 'Top view']) expect(button(name).disabled).toBe(true)
-  expect(camera().disabled).toBe(true)
   expect(screen.getByText(/W\/A\/S\/D to move/)).toBeTruthy()
 
   send({ type: 'progress', progress: 0.42 })
   expect(screen.getByRole('status').textContent).toBe('Loading the room… 42%')
 })
 
-it('opens at Room view with the scan’s counts, and each view or camera moves the camera', async () => {
+it('opens at Room view, and each view moves the camera', async () => {
   await open()
   send({ type: 'ready', scene })
   expect(screen.queryByRole('status')).toBeNull()
-  expect(screen.getByText('1199 video views · 757,543 splats')).toBeTruthy()
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
-  expect(camera().options).toHaveLength(1199)
-  expect(camera().value).toBe('0')
 
   fireEvent.click(button('Overview'))
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'overview'))
   fireEvent.click(button('Top view'))
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'top'))
+  fireEvent.click(button('Room view'))
+  expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
+})
+
+// The placing tools are read from the page's own address, so a test that wants them puts `?tools` there.
+const withTools = () => history.replaceState(null, '', '/apps/roam/?tools')
+const camera = () => screen.getByLabelText('Camera') as HTMLSelectElement
+afterEach(() => history.replaceState(null, '', '/'))
+
+it('keeps the placing tools out of the room everyone else sees', async () => {
+  await open()
+  send({ type: 'ready', scene })
+  expect(screen.queryByLabelText('Camera')).toBeNull()
+  expect(screen.queryByRole('link', { name: '1199 video views' })).toBeNull()
+  expect(viewer.props!.onWhere).toBeUndefined()
+})
+
+it('with tools, links the scan’s counts to their files and jumps to any filmed camera', async () => {
+  withTools()
+  await open()
+  expect(camera().disabled).toBe(true)
+  send({ type: 'ready', scene })
+  expect(screen.getByRole('link', { name: '1199 video views' }).getAttribute('href')).toBe('/apps/roam/scene.json')
+  expect(screen.getByRole('link', { name: '757,543 splats' }).getAttribute('href')).toBe('/apps/roam/room.spz')
+  expect(camera().options).toHaveLength(1199)
+  expect(camera().value).toBe('0')
   fireEvent.change(camera(), { target: { value: '3' } })
   expect(viewer.props!.pose).toEqual(poseFor(scene, 3))
   expect(camera().value).toBe('3')
   fireEvent.click(button('Room view'))
-  expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
   expect(camera().value).toBe('0')
 })
 
-it('shows where the camera is once the room is ready, and copies it', async () => {
+it('with tools, shows where the camera is once the room is ready, and copies it', async () => {
+  withTools()
   await open()
   const writeText = vi.fn(async () => {})
   vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
@@ -144,7 +165,7 @@ it('walks the scan alone, with nobody in it and no room in the address', async (
   // Nobody to draw or hear, and nobody to tell: where the walker stands is still kept, because walking the scan
   // with your own body starts from it, and a press still lands, though alone it watches nobody.
   expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onStance: expect.any(Function), onPick: expect.any(Function) })
-  expect(screen.queryByText('sound off')).toBeNull()
+  expect(screen.queryByRole('img', { name: 'sound off' })).toBeNull()
   expect(screen.queryByText(/left here/)).toBeNull()
   expect(button('Start a room')).toBeTruthy()
 })

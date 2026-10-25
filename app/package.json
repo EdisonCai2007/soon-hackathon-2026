@@ -27,6 +27,8 @@
     "test:runtime": "vitest run --config vitest.config.runtime.ts"
   },
   "dependencies": {
+    "@fontsource/archivo": "^5.3.0",
+    "@fontsource/arimo": "^5.3.0",
     "@mediapipe/tasks-vision": "1.1.1",
     "@sparkjsdev/spark": "~2.4.0",
     "class-variance-authority": "^0.7.1",

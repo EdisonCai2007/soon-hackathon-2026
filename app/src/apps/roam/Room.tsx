@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { useCasting } from './casting'
 import { RoomPeople } from './Host'
 import { cameraLink } from './invite'
 import { Join } from './Join'
 import { hostKeyFor, useLiveRoom } from './live-room'
+import { Pill } from './Pill'
 import { Scan } from './Scan'
+import { Centered } from './Screen'
+import { Wordmark } from './Wordmark'
 
 const STOPPED: Record<string, string> = {
   full: 'This room is full. Ask whoever shared the link to start another one.',
@@ -15,11 +16,11 @@ const STOPPED: Record<string, string> = {
 }
 
 function Stopped({ message }: { message: string }) {
-  return <Card className="grid justify-items-start gap-4 p-6">
-    <h1>ROAM</h1>
-    <p>{message}</p>
-    <Button type="button" onClick={() => location.reload()}>Try again</Button>
-  </Card>
+  return <Centered>
+    <h1><Wordmark className="h-10" /><span className="sr-only">ROAM</span></h1>
+    <p className="text-2xl font-bold">{message}</p>
+    <Pill type="button" look="loud" onClick={() => location.reload()}>Try again</Pill>
+  </Centered>
 }
 
 /** Inside a room: everyone is drawn in the scan, heard from where they stand, and listed beside it. */

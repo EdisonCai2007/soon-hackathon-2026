@@ -70,22 +70,29 @@ it('asks who you are before putting you in the room', async () => {
   expect(screen.getByTestId('viewer')).toBeTruthy()
 })
 
-it('draws the people in the room and lists them beside it', async () => {
+it('draws the people in the room and lists them under who’s in, folded until opened', async () => {
   await open({ peers: [peer('a1', 'Alex'), peer('b2', 'Sam')] })
   await ready()
   expect(viewer.props!.peers).toHaveLength(2)
+  const whosIn = screen.getByRole('button', { name: /who’s in · 3/ })
+  expect(whosIn.getAttribute('aria-expanded')).toBe('false')
+  expect(screen.queryByText('3 people')).toBeNull()
+  fireEvent.click(whosIn)
+  expect(whosIn.getAttribute('aria-expanded')).toBe('true')
   expect(screen.getByText('3 people')).toBeTruthy()
   expect(screen.getByText('Alex')).toBeTruthy()
+  fireEvent.click(whosIn)
+  expect(screen.queryByText('Alex')).toBeNull()
 })
 
 it('says sound is off until the first press on the page starts it', async () => {
   await open()
-  expect(screen.getByText('sound off')).toBeTruthy()
+  expect(screen.getByRole('img', { name: 'sound off' })).toBeTruthy()
   fireEvent.pointerDown(screen.getByText('ROAM'))
   expect(fakes.unlocks).toBe(1)
   cleanup()
   await open({ soundBlocked: false })
-  expect(screen.queryByText('sound off')).toBeNull()
+  expect(screen.queryByRole('img', { name: 'sound off' })).toBeNull()
 })
 
 it('keeps hands off until it is asked, and says so when they can not be read', async () => {
@@ -142,6 +149,7 @@ it('closes the view of somebody who leaves while being watched', async () => {
 it('lets the host remove somebody', async () => {
   fakes.host = true
   await open({ peers: [peer('a1', 'Alex')] })
+  fireEvent.click(screen.getByRole('button', { name: /who’s in/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Remove Alex' }))
   expect(fakes.removed).toEqual(['a1'])
 })

@@ -28,3 +28,6 @@ export const cameraLink = (origin: string, app: string, roomId: string): string 
 
 /** The link a phone opens to walk the real home, which belongs to no room. */
 export const leaveLink = (origin: string, app: string): string => `${origin}/apps/${app}/leave`
+
+/** The tools for placing things in the scan show only at an address ending `?tools`; everyone else sees the room. */
+export const toolsOn = () => new URLSearchParams(location.search).has('tools')

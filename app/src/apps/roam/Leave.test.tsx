@@ -33,8 +33,9 @@ function phone({ ar = true } = {}) {
     requestSession: () => { requested(); return Promise.resolve(session) },
   } })
   vi.stubGlobal('XRWebGLLayer', function Layer() {})
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((() =>
-    ({ makeXRCompatible: () => Promise.resolve() })) as unknown as typeof HTMLCanvasElement.prototype.getContext)
+  // Only the AR session's WebGL canvas is stood in; the screens' 2D screentone gets none, as the test DOM has none.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((kind: string) =>
+    kind === 'webgl' ? { makeXRCompatible: () => Promise.resolve() } : null) as unknown as typeof HTMLCanvasElement.prototype.getContext)
   return {
     requested,
     ended: session.end,
