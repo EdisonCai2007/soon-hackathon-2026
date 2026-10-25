@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { CAPACITY, colorFor, isFull, readMessage, readName, readRole, relay, type Member } from "./wire.ts";
+import { CAPACITY, CAST_WAIT, castAllowed, colorFor, isFull, readMessage, readName, readRole, relay, type Member } from "./wire.ts";
 
 const member = (id: string, color = "#f97362"): Member => ({ id, name: id, color, role: "guest", pose: null });
 const pose = { x: 1, y: 2, z: 3, yaw: 0.5 };
@@ -58,6 +58,19 @@ it("refuses a position that is missing, misshapen, or outside the scanned space"
   expect(readMessage('{"type":"pose","pose":{"x":null,"y":0,"z":0,"yaw":0}}')).toBeNull();
 });
 
+it("reads a cast of a technique it knows, and nothing else", () => {
+  expect(readMessage(JSON.stringify({ type: "cast", technique: "purple" }))).toEqual({ type: "cast", technique: "purple" });
+  expect(readMessage(JSON.stringify({ type: "cast", technique: "fireball" }))).toBeNull();
+  expect(readMessage(JSON.stringify({ type: "cast" }))).toBeNull();
+  expect(readMessage(JSON.stringify({ type: "cast", technique: 1 }))).toBeNull();
+});
+
+it("lets a page cast once it has waited, and never sooner", () => {
+  expect(castAllowed(undefined, 0)).toBe(true);
+  expect(castAllowed(1000, 1000 + CAST_WAIT)).toBe(true);
+  expect(castAllowed(1000, 1000 + CAST_WAIT - 1)).toBe(false);
+});
+
 it("sends a position to everyone else and a handshake only to the person it names", () => {
   const self = member("a1");
   const others = [member("b2"), member("c3")];
@@ -66,4 +79,10 @@ it("sends a position to everyone else and a handshake only to the person it name
   expect(relay({ type: "signal", to: "gone", data: 7 }, self, others)).toBeNull();
   // A removal is the room's to judge against the host's key, never a relay.
   expect(relay({ type: "remove", id: "b2", key: "k" }, self, others)).toBeNull();
+});
+
+it("sends a cast to everyone else, naming who made it", () => {
+  const self = member("a1");
+  expect(relay({ type: "cast", technique: "domain" }, self, [member("b2")]))
+    .toEqual({ to: ["b2"], payload: { type: "cast", id: "a1", technique: "domain" } });
 });

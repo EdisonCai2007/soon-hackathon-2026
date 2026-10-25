@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { Loading } from '@/components/Loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useCasts, useTechniqueSounds, type Casting } from './casting'
 import type { Pose as Stance } from './messages'
 import { NoteCount, NotePanel } from './NotePanel'
 import { mediaUrl, readNotes, removeNote, type Note } from './notes'
@@ -28,6 +29,21 @@ export type Live = {
   tell: (stance: Stance) => void
   people: ReactNode
   notice?: ReactNode
+  /** Hand reading for this page: off until the person asks for it. */
+  casting: Casting
+}
+
+const CANNOT_READ = 'This browser can’t read your hands.'
+
+function Hands({ casting }: { casting: Casting }) {
+  const reading = casting.step === 'on' || casting.step === 'starting'
+  return <>
+    {casting.step === 'on' && <Badge>hands on</Badge>}
+    {casting.step === 'starting' && <Badge variant="outline">reading your hands…</Badge>}
+    {casting.step === 'cannot' && <Badge variant="outline">{CANNOT_READ}</Badge>}
+    {casting.seen && <Badge variant="outline">{`seeing: ${casting.seen}`}</Badge>}
+    <Button type="button" variant="outline" onClick={casting.turn}>{reading ? 'Hands off' : 'Hands on'}</Button>
+  </>
 }
 
 const loadingLabel = (progress: number | null) =>
@@ -55,6 +71,7 @@ function Bar({ ready, live, act, box, notes }: { ready: Ready; live?: Live; act:
     {ready && <Badge variant="secondary">{ready.scene.views} video views · {ready.scene.splats.toLocaleString('en-US')} splats</Badge>}
     <NoteCount notes={notes} />
     {live?.soundBlocked && <Badge variant="outline">sound off</Badge>}
+    {live && <Hands casting={live.casting} />}
     <div className="ml-auto flex flex-wrap gap-2">
       {VIEWS.map(([view, label]) => (
         <Button key={label} type="button" variant="outline" disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Button>
@@ -99,6 +116,27 @@ function useNoteVoice(app: string, scene: Scene | null) {
   return { voice, play, stop }
 }
 
+type ViewProps = {
+  app: string
+  live?: Live
+  scene: Scene | null
+  pose: Pose | null
+  act: Act
+  notes: readonly Note[]
+  voice: NoteVoice | null
+  onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
+}
+
+/** The scan itself, with the techniques running over it and where this person's own view stands. */
+function View({ app, live, scene, pose, act, notes, voice, onPick }: ViewProps) {
+  const [stance, setStance] = useState<Stance | null>(null)
+  const casts = useCasts(live?.peers, live?.casting.mine, stance)
+  useTechniqueSounds(live?.audio, casts, scene, stance)
+  return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
+    peers={live?.peers} notes={notes} audio={live?.audio} voice={voice} casts={casts} onPick={onPick}
+    onStance={live && ((here) => { setStance(here); live.tell(here) })} />
+}
+
 /** The scanned room in the page: walked alone, or shared with whoever a live room holds. */
 export function Scan({ app, live, before }: { app: string; live?: Live; before?: ReactNode }) {
   const [state, dispatch] = useReducer(viewerReducer, initialViewer)
@@ -132,8 +170,8 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
       {state.status === 'error' || state.status === 'no-webgl'
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
         : <div ref={setBox} className="relative h-[70vh] min-h-80 overflow-hidden rounded-xl border bg-[#10151c]">
-          <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={ready?.pose ?? null} onEvent={dispatch}
-            peers={live?.peers} notes={notes} audio={live?.audio} onStance={live?.tell} voice={voice}
+          <View app={app} live={live} scene={ready?.scene ?? null} pose={ready?.pose ?? null} act={dispatch} notes={notes}
+            voice={voice}
             onPick={(picked, saved) => {
               if (picked.kind === 'note') return setOpened(picked.id)
               if (live) setWatching({ id: picked.id, saved })

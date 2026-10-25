@@ -7,7 +7,7 @@ import type { Member } from './messages'
 import type { Peer } from './presence'
 
 const peer = (id: string, name: string, role: Member['role'] = 'guest'): Peer =>
-  ({ member: { id, name, color: '#4fb8ff', role, pose: null }, motion: null, stream: null })
+  ({ member: { id, name, color: '#4fb8ff', role, pose: null }, motion: null, stream: null, cast: null })
 
 afterEach(() => {
   cleanup()

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { PerspectiveCamera, Scene as World, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark'
+import { makeCastStage, type Cast, type CastStage } from './casting-stage'
 import { PovControls } from './pov-controls'
 import { applyPose, cameraPose, displayQuaternion, loadScene, type Pose } from './scene'
 import { dueToSend } from './pose-feed'
@@ -11,7 +12,7 @@ import type { Note } from './notes'
 import type { NoteVoice } from './note-sound'
 import type { ViewerEvent } from './viewer-state'
 
-type Viewer = { camera: PerspectiveCamera; controls: PovControls; stage: Stage | null }
+type Viewer = { camera: PerspectiveCamera; controls: PovControls; stage: Stage | null; spells: CastStage | null }
 type Props = {
   sceneUrl: string
   splatUrl: string
@@ -29,6 +30,8 @@ type Props = {
   voice?: NoteVoice | null
   /** Where this page's own person stands, ten times a second, for the others to draw. */
   onStance?: (stance: Stance) => void
+  /** The techniques running right now, drawn where whoever cast them stands. */
+  casts?: readonly Cast[]
 }
 
 // Three.js r180 draws with WebGL 2 alone, so a browser without it gets a plain message, not a blank box.
@@ -37,12 +40,13 @@ const hasWebGL = () => document.createElement('canvas').getContext('webgl2') !==
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
 export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], notes = [], audio = null, onPick, voice = null,
-  onStance }: Props) {
+  onStance, casts = [] }: Props) {
   const host = useRef<HTMLDivElement>(null)
+  const wash = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, notes, onPick, voice, onStance })
-  useEffect(() => { latest.current = { peers, notes, onPick, voice, onStance } })
+  const latest = useRef({ peers, notes, onPick, voice, onStance, casts })
+  useEffect(() => { latest.current = { peers, notes, onPick, voice, onStance, casts } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -50,6 +54,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       return
     }
     const box = host.current!
+    const washing = wash.current!
     let stopped = false
     const fail = (message: string) => {
       if (!stopped) onEvent({ type: 'error', message })
@@ -107,15 +112,17 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       await splats.initialized
       if (stopped) return
       const stage = makeStage(world, scene, audio)
+      const spells = makeCastStage(world, scene)
       stage.sync(latest.current.peers)
       stage.show(latest.current.notes)
-      viewer.current = { camera, controls, stage }
       let previous: number | null = null
       let told: number | null = null
       renderer.setAnimationLoop((time) => {
         controls.update(previous === null ? 0 : (time - previous) / 1000)
         previous = time
         stage.update(camera, time)
+        // A technique is drawn over the room's people, and its brightest moment washes the whole view.
+        washing.style.opacity = String(spells.draw(latest.current.casts, time))
         latest.current.voice?.hear(camera.position)
         // The others are told where this person stands on the same gate their figures are drawn on.
         if (latest.current.onStance && dueToSend(told, time)) {
@@ -124,6 +131,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
         }
         renderer.render(world, camera)
       })
+      viewer.current = { camera, controls, stage, spells }
       onEvent({ type: 'ready', scene })
     })().catch((error: unknown) => {
       console.error(error)
@@ -133,6 +141,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
     return () => {
       stopped = true
       viewer.current?.stage?.dispose()
+      viewer.current?.spells?.dispose()
       viewer.current = null
       observer.disconnect()
       renderer.domElement.removeEventListener('webglcontextlost', lost)
@@ -159,5 +168,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
   // What is left here changes when somebody leaves or takes back a note; the markers follow.
   useEffect(() => { viewer.current?.stage?.show(notes) }, [notes])
 
-  return <div ref={host} className="absolute inset-0" />
+  return <div ref={host} className="absolute inset-0">
+    <div ref={wash} className="pointer-events-none absolute inset-0 z-10 bg-white opacity-0" aria-hidden="true" />
+  </div>
 }

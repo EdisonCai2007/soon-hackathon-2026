@@ -1,6 +1,6 @@
 # Make the sign, and the room answers
 
-**Status:** planned — the plan is written and saved; nothing built yet.
+**Status:** in progress — built and tested; the frame-cost measurement (task 1.2) and the live walk-through wait on somebody with a camera.
 **Branch:** roam-gestures (branched from `roam-notes`, so the notes work sits underneath it)
 **Open questions:** none
 
@@ -100,3 +100,8 @@ Non-goals: firing a technique from a phone standing in the real room (the AR ses
 - **2026-10-24** — Found while planning: the stable `@mediapipe/tasks-vision` is 1.1.1, published 2026-10-14, so it clears the seven-day rule on a new package without taking a release candidate.
 - **2026-10-24** — Asked where to save the plan, since `roam-notes` already has an open pull request whose description a checkpoint would overwrite → chose a branch of its own, `roam-gestures`, cut from the `roam-notes` head, so pull request #9 keeps reading as the notes plan and the notes work still sits underneath this one.
 - **2026-10-24** — Checkpoint: the plan alone. No code, no package, no vendored model yet; task 1.2's frame measurement is the next thing and gates the reading rate.
+- **2026-10-24** — Assumed while building: the hand reader's WebAssembly is copied out of the pinned package at build time and git-ignored, while the 7.8 MB model is committed, because each WebAssembly file is over 12 MB and this way a build needs npm and no network.
+- **2026-10-24** — Found while building: `Scan` passed the lint check's complexity limit once the casts and their sounds were added, so the scan and its casts moved into a `View` part in the same file. No behaviour changed, and `stage.ts` and `placement.ts` were left alone as asked.
+- **2026-10-24** — Found while building: a cast needs no clearing — `techniques.ts` already answers "nothing" once a technique's life has passed, so the reducer records what somebody cast and both the drawing and the sound end themselves.
+- **2026-10-24** — Found while building: `Peer` gained a `cast` field, so the figure tests' fixtures each gained one line. That is the whole overlap with pull request #10 outside `RoomViewer.tsx`, where the change is one prop and two lines.
+- **2026-10-24** — Checkpoint: built. Both roam folders are at 100% of lines, branches, functions and statements, with lint, types, knip, repeated code, the runtime tests and the key and action checks clean. Fourteen tests outside ROAM fail on this Windows machine as they did before the change (path separators, and timeouts under full parallel load), and `npm run test:checks` cannot prove two of its seven gates here; CI is the gate. The reading rate stands at 66 ms until task 1.2 measures it.

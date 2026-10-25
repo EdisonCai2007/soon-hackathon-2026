@@ -1,7 +1,7 @@
 // One live room per link. A plain class, not a subclass of the runtime's base: nothing here imports
 // cloudflare:workers, so the test suite opens a room with a stand-in state and stand-in sockets.
 import { hostKey, memberId, sameKey } from "./ids.ts";
-import { CAPACITY, colorFor, isFull, readMessage, readName, readRole, relay, type Member, type Outgoing } from "./wire.ts";
+import { CAPACITY, castAllowed, colorFor, isFull, readMessage, readName, readRole, relay, type Member, type Outgoing } from "./wire.ts";
 
 const HOST = "host";
 // Reasons a room closes a socket, outside the range the browser uses for its own.
@@ -18,6 +18,14 @@ const attached = (socket: WebSocket): Member | null => {
 };
 
 const send = (socket: WebSocket, payload: Outgoing) => socket.send(JSON.stringify(payload));
+
+/** A cast's time is kept on the socket, so a page casting faster than a person could is relayed nothing. */
+function noteCast(socket: WebSocket, self: Member): boolean {
+  const now = Date.now();
+  if (!castAllowed(self.castAt, now)) return false;
+  socket.serializeAttachment({ ...self, castAt: now });
+  return true;
+}
 
 export class RoamRoom implements DurableObject {
   private readonly state: RoomState;
@@ -77,6 +85,7 @@ export class RoamRoom implements DurableObject {
     if (!self || !message) return;
     const others = this.everyone().filter(({ member }) => member.id !== self.id);
     if (message.type === "remove") return this.evict(message, others);
+    if (message.type === "cast" && !noteCast(socket, self)) return;
     // A position is kept on the socket so whoever joins next is told where this person already stands.
     if (message.type === "pose") socket.serializeAttachment({ ...self, pose: message.pose });
     const next = relay(message, self, others.map(({ member }) => member));
