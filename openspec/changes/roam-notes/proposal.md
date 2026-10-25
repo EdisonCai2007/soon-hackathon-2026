@@ -1,6 +1,6 @@
 # The home remembers
 
-**Status:** in progress — the place and the scan side are built and tested; the phone's own screen waits on a check with a real phone, and the scale and the taped spots wait on the owner being in the home.
+**Status:** in progress — the place, the scan side and the phone's own screen are built and tested; the scale constant and taping the spots wait on the owner being in the home, and then the walk.
 **Branch:** roam-notes
 **Open questions:** none
 
@@ -99,4 +99,8 @@ Non-goals: leaving a note from inside the scan on a laptop, an iPhone leaving no
 - **2026-10-24** — Found while building: a press can land between two frames, and a raycast reads whatever world matrix the last frame left behind, so picking brings its own candidates up to date. Without that, a marker was judged to sit at the middle of the room.
 - **2026-10-24** — Found while building: `Notes.tsx` and `notes.ts` are one name on a case-insensitive filesystem, so the screen is `NotePanel.tsx`.
 - **2026-10-24** — Asked what a preview should show, with the separate bodies work sitting uncommitted on this branch → chose this change alone; the bodies work was committed on its own `roam-body` branch and left for its own review.
+- **2026-10-24** — Checked on a real Android phone (Chrome 155): the page's own controls do draw over a live AR session and take presses, so the overlay path stands and the fallback flow was not needed. The microphone is reachable mid-session; the camera is not, so a photograph comes from the system camera through a file input, with the pose taken at the press.
+- **2026-10-24** — Found on that phone, and fixed here: an `immersive-ar` session with no render layer answers every frame with no pose at all — 823 in a row. So `ar-session.ts` has never reported a position, and the live room's camera role has never worked; it was published unchecked. The session now attaches a layer it draws nothing into, and `Phone.tsx` hands its live controls over as the overlay, so its Stop button is reachable at all.
+- **2026-10-24** — Assumed: a photograph goes through the system camera rather than WebXR's raw camera access, because the file input works today and camera access is a separate feature to ask for and read back through the GPU.
+- **2026-10-24** — Assumed: the voice cap rose from 300 KB to 400 KB, because the phone records Opus at about 15 KB a second and fifteen seconds of a loud room came to 230 KB; 400 KB leaves room and is still far below what a database value holds.
 - **2026-10-24** — Checkpoint: the place, its five routes and the scan side pass on their own — every ROAM file at 100% of lines, branches, functions and statements, with lint, types, knip, repeated code and the key and action checks clean. The whole suite still times out in places on this Windows machine under full parallel load, before this change as well as after; CI is the gate.

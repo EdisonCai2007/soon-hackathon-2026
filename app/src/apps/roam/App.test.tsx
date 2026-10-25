@@ -132,6 +132,9 @@ it("opens a shared link at the way in, and the camera link at the phone's screen
   cleanup()
 
   await open('/apps/roam/phone/0123456789abcdef0123', { '/apps/roam/scene.json': scene }, heading('Be the camera'))
+  cleanup()
+
+  await open('/apps/roam/leave', { '/apps/roam/scene.json': scene }, heading('Leave a note'))
 })
 
 const NOTE = { id: 'a'.repeat(16), kind: 'text', spot: { x: 1, y: -3.9, z: 2, yaw: 0 }, author: 'Dana',

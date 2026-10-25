@@ -8,10 +8,11 @@ export type Place = (typeof PLACES)[number];
 
 type Kind = "text" | "voice" | "photo";
 
-/** What anyone may leave: a short note, a few seconds of voice, a shrunken photo, and a bounded place. */
-export const CAPS = { words: 500, media: 300_000, notes: 200 };
+// A phone records Opus at about 15 KB a second, so fifteen seconds is around 230 KB: the cap leaves room for a
+// louder recorder without coming near what a database value holds.
+export const CAPS = { words: 500, media: 400_000, notes: 200 };
 // The whole request, so a padded upload is refused before its bytes are read.
-export const MAX_UPLOAD = 400_000;
+export const MAX_UPLOAD = 600_000;
 
 const MEDIA: Record<Kind, readonly string[]> = {
   text: [],

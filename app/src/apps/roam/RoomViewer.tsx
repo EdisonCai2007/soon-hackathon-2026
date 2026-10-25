@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { PerspectiveCamera, Scene as World, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark'
 import { PovControls } from './pov-controls'
-import { applyPose, cameraPose, displayQuaternion, parseScene, type Pose } from './scene'
+import { applyPose, cameraPose, displayQuaternion, loadScene, type Pose } from './scene'
 import { dueToSend } from './pose-feed'
 import { makeStage, pointerAt, stanceOf, type Picked, type Stage } from './stage'
 import type { Peer } from './presence'
@@ -33,12 +33,6 @@ type Props = {
 
 // Three.js r180 draws with WebGL 2 alone, so a browser without it gets a plain message, not a blank box.
 const hasWebGL = () => document.createElement('canvas').getContext('webgl2') !== null
-
-async function loadScene(url: string) {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  return parseScene(await response.json())
-}
 
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
