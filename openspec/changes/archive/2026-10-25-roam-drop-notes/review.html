@@ -11,7 +11,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Review · roam-drop-notes</title>
+<title>Review · 2026-10-25-roam-drop-notes</title>
 <style>
   /* The app's look for pages outside the app: the plan review page, the private pages, and a closed link's page.
    look.mjs swaps the colour sets between the markers for the app's own, from app/src/index.css; this copy of
@@ -360,11 +360,11 @@
 })();
 </script>
 </head>
-<body data-change="roam-drop-notes">
+<body data-change="2026-10-25-roam-drop-notes">
 <main>
 <header>
   <p class="eyebrow">Review</p>
-  <h1>roam-drop-notes</h1>
+  <h1>2026-10-25-roam-drop-notes</h1>
   <p class="muted"><span class="note-count">0 notes</span></p>
   <nav aria-label="Sections"><ul class="jump"><li><a href="#why">Why</a></li><li><a href="#changes">Changes</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#notes">Notes</a></li></ul></nav>
   <p class="hint">Tap + Note to comment. <span class="copies">Saving a note copies all your notes.</span> Open a drawing and tap it to see it full screen.</p>
@@ -425,6 +425,8 @@
 <li class="decision card" id="decision-9" data-note="decision-9" tabindex="0"><p class="meta"><span class="tag log">log</span>2026-10-25</p>Found while building: <code>roam-scene</code>'s movement-control scenario still named a note marker, so a <code>roam-scene</code> delta now drops it. Nothing it describes changes.</li>
 <li class="decision card" id="decision-10" data-note="decision-10" tabindex="0"><p class="meta"><span class="tag log">log</span>2026-10-25</p>Built and checked locally: the ROAM tests at full coverage, types, lint, knip, jscpd and the key and action checks pass. The 30 other failures in <code>npm test</code> are outside ROAM (Windows path separators, CRLF and slow-machine timeouts in <code>access</code>, <code>inbox</code>, <code>style</code> and two Worker source scans), and the wiki check fails across untouched pages on this machine; CI is the gate. The deltas are reconciled into <code>openspec/specs/</code> and <code>roam-notes</code> is retired there by hand, so the archive skips specs.</li>
 <li class="decision card" id="decision-11" data-note="decision-11" tabindex="0"><p class="meta"><span class="tag asked">asked</span>2026-10-25</p>Asked whether to publish this branch, which also carries the unfinished <code>roam-ar-view</code> and <code>roam-gestures</code> work → chose shipping all of it on purpose.</li>
+<li class="decision card" id="decision-12" data-note="decision-12" tabindex="0"><p class="meta"><span class="tag log">log</span>2026-10-25</p>Checked on staging: <code>GET /apps/roam/api/notes</code> answers 404 and <code>/apps/roam/leave</code> loads. The Android walk needs the owner in the home, and <code>roam-ar-view</code> task 13.4 already walks this screen from the phone, so it is left to that task rather than held here.</li>
+<li class="decision card" id="decision-13" data-note="decision-13" tabindex="0"><p class="meta"><span class="tag log">log</span>2026-10-25</p>Archived on <code>remove-notes</code> to publish, carrying the unfinished <code>roam-ar-view</code> and <code>roam-gestures</code> work with it on purpose.</li>
 </ol>
 </section>
 <section id="notes" aria-labelledby="notes-h"><h2 id="notes-h">Your notes</h2>

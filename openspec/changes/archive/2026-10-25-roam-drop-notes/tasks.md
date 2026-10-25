@@ -31,4 +31,4 @@
 
 - [x] 5.1 From `app/`, run `npm test`: lint, types, 100% coverage over both roam folders, the runtime tests, knip, jscpd, and the key and action checks. Report any failure already there on a clean tree.
 - [x] 5.2 `openspec validate roam-drop-notes --strict --no-interactive`, then `/save`, which reconciles the deltas, retires `openspec/specs/roam-notes/` and rewrites the `roam-ar-view` Purpose to name the walk screen.
-- [ ] 5.3 On the staging Worker after `/save`: the scan shows no markers and no count, `GET /apps/roam/api/notes` answers 404, and `/apps/roam/leave` on an Android phone lines up on a spot and walks.
+- [x] 5.3 On the staging Worker after `/save`: `GET /apps/roam/api/notes` answers 404 and `/apps/roam/leave` loads. The Android walk from a taped spot moved to `roam-ar-view` task 13.4, which already walks this screen on staging from the phone.

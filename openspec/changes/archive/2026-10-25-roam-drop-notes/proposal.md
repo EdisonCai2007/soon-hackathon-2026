@@ -1,6 +1,6 @@
 # Take notes out of ROAM
 
-**Status:** built — publishing; the phone walk on staging waits on the owner.
+**Status:** shipped — archived.
 **Branch:** remove-notes
 **Open questions:** none
 
@@ -98,3 +98,5 @@ None.
 - **2026-10-25** — Found while building: `roam-scene`'s movement-control scenario still named a note marker, so a `roam-scene` delta now drops it. Nothing it describes changes.
 - **2026-10-25** — Built and checked locally: the ROAM tests at full coverage, types, lint, knip, jscpd and the key and action checks pass. The 30 other failures in `npm test` are outside ROAM (Windows path separators, CRLF and slow-machine timeouts in `access`, `inbox`, `style` and two Worker source scans), and the wiki check fails across untouched pages on this machine; CI is the gate. The deltas are reconciled into `openspec/specs/` and `roam-notes` is retired there by hand, so the archive skips specs.
 - **2026-10-25** — Asked whether to publish this branch, which also carries the unfinished `roam-ar-view` and `roam-gestures` work → chose shipping all of it on purpose.
+- **2026-10-25** — Checked on staging: `GET /apps/roam/api/notes` answers 404 and `/apps/roam/leave` loads. The Android walk needs the owner in the home, and `roam-ar-view` task 13.4 already walks this screen from the phone, so it is left to that task rather than held here.
+- **2026-10-25** — Archived on `remove-notes` to publish, carrying the unfinished `roam-ar-view` and `roam-gestures` work with it on purpose.
