@@ -4,6 +4,7 @@ import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark'
 import { PovControls } from './pov-controls'
 import { applyPose, cameraPose, displayQuaternion, parseScene, type Pose } from './scene'
 import { dueToSend } from './pose-feed'
+import { addPeople, type People } from './people'
 import { makeStage, pointerAt, stanceOf, type Stage } from './stage'
 import type { Peer } from './presence'
 import type { Pose as Stance } from './messages'
@@ -91,6 +92,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
     }
     renderer.domElement.addEventListener('click', picked)
     let splats: SplatMesh | undefined
+    let people: People | undefined
 
     void (async () => {
       const scene = await loadScene(sceneUrl)
@@ -109,10 +111,17 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       const stage = makeStage(world, scene, audio)
       stage.sync(latest.current.peers)
       viewer.current = { camera, controls, stage }
+      // The filmed people arrive after the room: a model that fails to load leaves the scan as it was.
+      void addPeople(world, scene).then((loaded) => {
+        if (stopped) loaded.dispose()
+        else people = loaded
+      }, (error: unknown) => console.error(error))
       let previous: number | null = null
       let told: number | null = null
       renderer.setAnimationLoop((time) => {
-        controls.update(previous === null ? 0 : (time - previous) / 1000)
+        const seconds = previous === null ? 0 : (time - previous) / 1000
+        controls.update(seconds)
+        people?.update(seconds)
         previous = time
         stage.update(camera, time)
         // The others are told where this person stands on the same gate their figures are drawn on.
@@ -133,6 +142,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       stopped = true
       viewer.current?.stage?.dispose()
       viewer.current = null
+      people?.dispose()
       observer.disconnect()
       renderer.domElement.removeEventListener('webglcontextlost', lost)
       renderer.domElement.removeEventListener('click', picked)

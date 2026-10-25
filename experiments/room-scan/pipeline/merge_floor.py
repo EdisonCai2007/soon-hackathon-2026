@@ -12,6 +12,8 @@ parser.add_argument('--cell',type=float,default=.15,help='Grid size in metres fo
 parser.add_argument('--min-existing',type=int,default=20,help='Existing splats in a cell for it to count as covered.')
 parser.add_argument('--prefer-floor',help='x,z,radius in viewer coordinates: inside this circle only the floor\'s splats stay, such as the top of the stairs, which the old scan filled with haze it glimpsed from above.')
 parser.add_argument('--upper-floor',help='a,b,c of the existing floor\'s plane y = a x + b z + c in viewer coordinates, when the new floor lies below it: over the existing floor, splats above it are the existing scan\'s and splats below it the new floor\'s.')
+parser.add_argument('--split-below',type=float,help='Viewer height: below it, each place in the floor plan belongs to the scan whose cameras came nearest, for a new half of a storey already partly scanned. The old half stays exactly as it is.')
+parser.add_argument('--pass-gap',type=float,default=1.0,help='With --split-below, new cameras this close to old ones are passing through the old half and claim nothing.')
 parser.add_argument('--output',type=Path,required=True,help='Workdir with room_merged.ply, for export_splats.py --source.')
 args=parser.parse_args()
 OUT=args.output.resolve();(OUT/'splat_dataset/sparse/0').mkdir(parents=True,exist_ok=True)
@@ -35,6 +37,14 @@ if args.upper_floor:
     cell=lambda p:np.floor(p[:,[0,2]]/.3).astype(np.int64)@np.array([1,1<<24])
     fc,fn=np.unique(cell(pe[np.abs(he)<.05]),return_counts=True)
     lose|=he<-.15;drop|=np.isin(cell(pf),fc[fn>=10])&(hf>-.05)&~stair
+if args.split_below is not None:
+    from scipy.spatial import cKDTree
+    cam=lambda w:np.load(w/'reconstruction.npz')['camera_poses'][0][:,:3,3]@A.T+b
+    ce,cf=cam(args.existing_workdir),cam(args.floor_workdir);ce,cf=ce[ce[:,1]<args.split_below][:,[0,2]],cf[cf[:,1]<args.split_below][:,[0,2]]
+    old=cKDTree(ce);cf=cf[old.query(cf)[0]>args.pass_gap];new=cKDTree(cf)
+    mine=lambda p:new.query(p[:,[0,2]])[0]<old.query(p[:,[0,2]])[0]
+    low_e=pe[:,1]<args.split_below;low_f=pf[:,1]<args.split_below
+    lose|=low_e&mine(pe);drop=(low_f&~mine(pf))|~low_f
 merged=np.concatenate([E[~lose],F[~drop]])
 PlyData([PlyElement.describe(merged,'vertex')],text=False).write(str(OUT/'room_merged.ply'))
 # The export reads cameras and initial points from both scans, in order: existing frames, then the floor's.
