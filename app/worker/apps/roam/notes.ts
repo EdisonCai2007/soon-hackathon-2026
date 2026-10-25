@@ -62,3 +62,8 @@ export const listed = (row: Row): Note => ({ id: row.id, kind: row.kind, spot: {
   author: row.author, words: row.words, media: row.media === 1, createdAt: row.created_at });
 
 export const isFull = (count: number): boolean => count >= CAPS.notes;
+
+/** A kept file's bytes, however the database hands them over: D1 answers with an array of byte values, and the
+ *  test suite's own database with the bytes themselves. */
+export const mediaBytes = (media: ArrayBuffer | Uint8Array | number[]): Uint8Array =>
+  media instanceof Uint8Array ? media : new Uint8Array(media);

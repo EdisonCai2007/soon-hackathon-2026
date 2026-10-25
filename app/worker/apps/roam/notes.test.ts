@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { CAPS, isFull, isPlace, listed, mediaType, readLeaving, type Given } from "./notes.ts";
+import { CAPS, isFull, isPlace, listed, mediaBytes, mediaType, readLeaving, type Given } from "./notes.ts";
 
 const SPOT = { x: 1, y: -3.9, z: 0.5, yaw: 1.2 };
 const given = (over: Partial<Given> = {}): Given =>
@@ -70,6 +70,14 @@ it("reads a row as a page wants it, saying whether there is anything to fetch", 
   expect(listed(row)).toEqual({ id: row.id, kind: "voice", spot: { x: 1, y: 2, z: 3, yaw: 0.5 }, author: "Sam",
     words: "", media: true, createdAt: row.created_at });
   expect(listed({ ...row, media: 0 }).media).toBe(false);
+});
+
+// D1 answers with an array of byte values, not the bytes: a file served straight from the row arrived empty.
+it("reads a kept file's bytes however the database hands them over", () => {
+  const bytes = new Uint8Array([137, 80, 78, 71]);
+  expect(mediaBytes([...bytes])).toEqual(bytes);
+  expect(mediaBytes(bytes)).toBe(bytes);
+  expect(mediaBytes(bytes.buffer as ArrayBuffer)).toEqual(bytes);
 });
 
 it("holds a place to its limit", () => {

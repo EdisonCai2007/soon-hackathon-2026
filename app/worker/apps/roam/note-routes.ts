@@ -1,7 +1,7 @@
 // The place's routes: what is left in the scanned home, kept in the app's own database because this account has no
 // object storage. The rules and caps are notes.ts's; this holds the statements. wiki/stack/places-and-notes.md
 import { hashed, isNoteId, noteId, noteSecret, keeperKey, sameKey } from "./ids.ts";
-import { ERRORS, isFull, isPlace, listed, MAX_UPLOAD, readLeaving, type Fault, type Row } from "./notes.ts";
+import { ERRORS, isFull, isPlace, listed, MAX_UPLOAD, mediaBytes, readLeaving, type Fault, type Row } from "./notes.ts";
 
 type Notes = Pick<Env, "DB">;
 
@@ -31,9 +31,9 @@ async function noteMedia(_request: Request, env: Notes, { url }: { url: URL }): 
   const id = url.searchParams.get("id");
   if (!isPlace(place) || !isNoteId(id)) return fail("not_found", 404);
   const row = await session(env).prepare("SELECT media, media_type FROM roam_notes WHERE place = ?1 AND id = ?2")
-    .bind(place, id).first<{ media: ArrayBuffer | null; media_type: string | null }>();
+    .bind(place, id).first<{ media: ArrayBuffer | Uint8Array | number[] | null; media_type: string | null }>();
   if (!row?.media || !row.media_type) return fail("not_found", 404);
-  return new Response(row.media, { headers: { ...forever, "Content-Type": row.media_type } });
+  return new Response(mediaBytes(row.media), { headers: { ...forever, "Content-Type": row.media_type } });
 }
 
 /** A file a form carried, as the rules want it: its bytes and the type the recorder or camera gave it. */
