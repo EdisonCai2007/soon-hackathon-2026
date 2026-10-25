@@ -6,11 +6,15 @@ TBD - created by archiving change roam-scan-on-site. Update Purpose after archiv
 ## Requirements
 
 ### Requirement: Scan renders on the site
-The ROAM app at `/apps/roam/` SHALL load the compressed Gaussian-splat room scan from the site's own static assets, with no external CDN, and render it oriented by the scene metadata's rotation and translation.
+The ROAM app at `/apps/roam/` SHALL load the compressed Gaussian-splat room scan from the site's own static assets, with no external CDN, and render it oriented by the scene metadata's rotation and translation, at every detail step the viewer uses.
 
 #### Scenario: Open ROAM
 - **WHEN** a person opens `/apps/roam/` on a preview or the live site
-- **THEN** the scanned room renders from the first source-camera view, and with the placing tools shown the page states the splat and view counts
+- **THEN** the scanned room renders from the first source-camera view
+
+#### Scenario: A laptop at full detail
+- **WHEN** a laptop draws the scan at its first, fullest detail step
+- **THEN** the room is drawn, not a dark view with only the people in it
 
 #### Scenario: Scan cannot load
 - **WHEN** the scan or its metadata fails to load, or the browser has no WebGL
@@ -54,13 +58,6 @@ The viewer SHALL move with W/A/S/D on the horizontal plane and Q/E vertically, w
 - **WHEN** the person has asked the view to follow their head and they lean to one side
 - **THEN** the drawn view shifts a little the other way, as a window would, and the place others see them standing in does not change
 
-### Requirement: Camera presets
-The viewer SHALL offer Room view, Overview and Top view, and, with the placing tools shown, a choice of each source-video camera, each placing the camera at a known position computed from the scene metadata.
-
-#### Scenario: Jump to a source camera
-- **WHEN** the person, with the placing tools shown, picks a source camera
-- **THEN** the camera moves to that camera's recorded position, direction, and field of view, and later movement starts from there
-
 ### Requirement: Scan fits the host
 Every ROAM asset SHALL be smaller than Cloudflare's 25 MiB static-asset file limit.
 
@@ -96,17 +93,6 @@ The scan SHALL include the upstairs rooms and the floor below, joined by the sta
 #### Scenario: A guest downstairs
 - **WHEN** a guest in a shared room stands on the lower floor
 - **THEN** their figure stands on the lower floor at the same size as a figure upstairs
-
-### Requirement: Where the camera is
-With the placing tools shown, the viewer SHALL show the camera's current position and facing direction in the scan's viewer coordinates, the same coordinates as the source-video cameras, kept current while the person moves, and SHALL offer an action that copies them as text.
-
-#### Scenario: Copy a position
-- **WHEN** the person walks to a spot, then chooses Copy
-- **THEN** the clipboard holds that spot's position and facing, and jumping to the copied spot from them shows the same view
-
-#### Scenario: Before the room loads
-- **WHEN** the scan has not finished loading
-- **THEN** no position is shown and Copy is unavailable
 
 ### Requirement: The lobby is whole
 The ground floor SHALL include the whole lobby, the party room behind the stairs as well as the living room, with its walls, ceiling and floor shown without gaps and without the colour of the party lights it was filmed under. Adding the party room SHALL leave the living room, hallway and stairs as they were.
@@ -149,13 +135,9 @@ Every part of a filmed person SHALL be drawn whenever it is in view, however far
 - **WHEN** the person stands close to a model's face after the model has walked away from its starting spot
 - **THEN** its hair, eyes, eyebrows and mouth are all drawn
 
-### Requirement: Placing tools stay out of the way
-The viewer SHALL show its placing tools — the scan's splat and view counts, the choice of each source-video camera, and where the camera is — only when the app's address asks for them with `?tools`. The app's plain address, and every room link, SHALL show none of them.
+### Requirement: View presets
+The viewer SHALL offer Room view, Overview and Top view, each placing the camera at a known position computed from the scene metadata.
 
-#### Scenario: A visitor walks the room
-- **WHEN** a person opens ROAM or a room's link as shared
-- **THEN** they see the views, who's in, sound, full screen and the directions, and no counts, camera choice or position
-
-#### Scenario: Edison places a model
-- **WHEN** a person opens ROAM with `?tools` on its address
-- **THEN** the counts, the camera choice and the camera's position with Copy all show, and each works as before
+#### Scenario: Jump to a preset
+- **WHEN** the person picks Room view, Overview or Top view
+- **THEN** the camera moves to that preset's position, and later movement starts from there

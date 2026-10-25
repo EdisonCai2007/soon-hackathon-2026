@@ -345,7 +345,7 @@ it('places the voices on the sound card the page hands it', async () => {
 it('draws everything while the rate holds, and gives up detail where it cannot', async () => {
   const { draw } = await live()
   const spark = fakes.sparks[fakes.sparks.length - 1]
-  expect(spark.enableLod).toBe(false)
+  expect(spark.enableLod).toBe(true)
   // Two seconds of warm-up, then two and a half at four frames a second: too slow, for long enough to matter.
   let time = 0
   for (let frame = 0; frame < 18; frame += 1) {
