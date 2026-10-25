@@ -78,65 +78,16 @@ it('opens at Room view, and each view moves the camera', async () => {
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
 })
 
-// The placing tools are read from the page's own address, so a test that wants them puts `?tools` there.
-const withTools = () => history.replaceState(null, '', '/apps/roam/?tools')
-const camera = () => screen.getByLabelText('Camera') as HTMLSelectElement
 afterEach(() => history.replaceState(null, '', '/'))
 
-it('keeps the placing tools out of the room everyone else sees', async () => {
+it('shows no placing tools, even at an address ending ?tools', async () => {
+  history.replaceState(null, '', '/apps/roam/?tools')
   await open()
   send({ type: 'ready', scene })
   expect(screen.queryByLabelText('Camera')).toBeNull()
-  expect(screen.queryByRole('link', { name: '1199 video views' })).toBeNull()
-  expect(viewer.props!.onWhere).toBeUndefined()
-})
-
-it('with tools, links the scan’s counts to their files and jumps to any filmed camera', async () => {
-  withTools()
-  await open()
-  expect(camera().disabled).toBe(true)
-  send({ type: 'ready', scene })
-  expect(screen.getByRole('link', { name: '1199 video views' }).getAttribute('href')).toBe('/apps/roam/scene.json')
-  expect(screen.getByRole('link', { name: '757,543 splats' }).getAttribute('href')).toBe('/apps/roam/room.spz')
-  expect(camera().options).toHaveLength(1199)
-  expect(camera().value).toBe('0')
-  fireEvent.change(camera(), { target: { value: '3' } })
-  expect(viewer.props!.pose).toEqual(poseFor(scene, 3))
-  expect(camera().value).toBe('3')
-  fireEvent.click(button('Room view'))
-  expect(camera().value).toBe('0')
-})
-
-it('with tools, shows where the camera is once the room is ready, and copies it', async () => {
-  withTools()
-  await open()
-  const writeText = vi.fn(async () => {})
-  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
-  act(() => viewer.props!.onWhere!({ position: [1.2344, -0.00004, -2.5], target: [1.9344, 0.1, -3.2], up: [0, 1, 0], fov: 55 }))
+  expect(screen.queryByText(/video views/)).toBeNull()
   expect(screen.queryByLabelText('Camera position')).toBeNull()
-  send({ type: 'ready', scene })
-  act(() => viewer.props!.onWhere!({ position: [1.2344, -0.00004, -2.5], target: [1.9344, 0.1, -3.2], up: [0, 1, 0], fov: 55 }))
-  const line = 'x 1.234 y 0.000 z -2.500 facing 0.70 0.10 -0.70'
-  expect(screen.getByLabelText('Camera position').textContent).toBe(line)
-  await act(async () => { fireEvent.click(button('Copy')) })
-  expect(writeText).toHaveBeenCalledWith(line)
-  expect(button('Copied')).toBeTruthy()
-  // Walking on reads a new spot, which has not been copied yet.
-  act(() => viewer.props!.onWhere!({ position: [2, 0, -2.5], target: [2, 0, -3.5], up: [0, 1, 0], fov: 55 }))
-  expect(button('Copy')).toBeTruthy()
-  // A browser that refuses the clipboard copies the selected line the old way, or leaves it selected to copy by hand.
-  const execCommand = vi.fn(() => true)
-  Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true })
-  writeText.mockRejectedValueOnce(new Error('denied'))
-  await act(async () => { fireEvent.click(button('Copy')) })
-  expect(execCommand).toHaveBeenCalledWith('copy')
-  expect(getSelection()?.toString()).toBe('x 2.000 y 0.000 z -2.500 facing 0.00 0.00 -1.00')
-  expect(button('Copied')).toBeTruthy()
-  act(() => viewer.props!.onWhere!({ position: [3, 0, -2.5], target: [3, 0, -3.5], up: [0, 1, 0], fov: 55 }))
-  execCommand.mockReturnValueOnce(false)
-  vi.stubGlobal('navigator', { ...navigator, clipboard: undefined })
-  await act(async () => { fireEvent.click(button('Copy')) })
-  expect(button('Copy')).toBeTruthy()
+  expect(viewer.props!.onWhere).toBeUndefined()
 })
 
 it('says why the room failed and tries again', async () => {

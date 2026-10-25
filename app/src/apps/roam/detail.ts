@@ -11,9 +11,10 @@ export type Detail = {
   stdDev: number
 }
 
-/** Heaviest first. Each step draws fewer splats, lets them be bigger on screen, and fills fewer pixels. */
+/** Heaviest first. Each step draws fewer splats, lets them be bigger on screen, and fills fewer pixels. Every step
+ *  keeps LOD on: the scan loads as a level-of-detail tree, and Spark draws that only through LOD, so off is a blank room. */
 export const STEPS: readonly Detail[] = [
-  { name: 'everything', lod: false, splats: 0, renderScale: 1, pixels: 1.5, stdDev: Math.sqrt(8) },
+  { name: 'everything', lod: true, splats: 0, renderScale: 1, pixels: 1.5, stdDev: Math.sqrt(8) },
   { name: '250k splats', lod: true, splats: 250_000, renderScale: 2, pixels: 1.25, stdDev: Math.sqrt(8) },
   { name: '120k splats', lod: true, splats: 120_000, renderScale: 3, pixels: 1, stdDev: Math.sqrt(5) },
   { name: '60k splats', lod: true, splats: 60_000, renderScale: 4, pixels: 0.6, stdDev: Math.sqrt(4) },
