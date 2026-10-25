@@ -1,12 +1,12 @@
 # Everyone moves through the room, on the device they have
 
-**Status:** built — the thumb pad, the frame-rate step-down and a guest's walk are done and green; leaning is cut on its own measurement. What remains is a walk on staging and the wiki.
+**Status:** in-progress — priority implementation is built; isolating its save and preparing the authorized staging-only deployment. Real-phone acceptance remains open.
 **Branch:** roam-ar-view (branched from `roam-notes`, so the notes work sits underneath it)
-**Open questions:** none. What is left is a walk on staging to judge whether the scan sits on the real walls, and whether `PHONE_HEIGHT_M` needs changing after it.
+**Open questions:** no unanswered scope choices. The user's Android Chrome phone must still prove the joined walk, including starting, turning, carrying on and stopping; a previous probe is not proof of this complete flow.
 
 ## Why
 
-The person who matters most in a ROAM room is the one who is **not** in the home: they joined from somewhere else, and the scanned home is the only way they can be there. Today they move by holding W/A/S/D and dragging a mouse. On a phone they cannot move at all, because there are no keys to hold. On a laptop the view stutters: measured on the owner's own, the scan draws at 2 to 28 frames a second, so the home it is meant to show is a slideshow.
+The priority is a person who joins from somewhere else on Android Chrome: walking and turning with their phone must move their view through the scan, and everyone else must see them in that same place. The walking feature exists in this workspace, but joining still leaves them using touch controls, and the starting point used for the picture and the shared position can disagree.
 
 The person standing in the real home needs none of that. They can see the home with their eyes. What the room needs from them is their camera and where they are standing, which is what their phone already sends.
 
@@ -14,11 +14,51 @@ So this change is about moving through the room, for whoever is away from it: a 
 
 ## What Changes
 
-- **Joined from anywhere on an Android phone, you walk the home by walking your own floor.** Press *Walk it* in the room and you are inside the scan: turn your body to look, take a step and you take a step in the home, at life size. When you run out of real floor, one press lets you carry on walking from where you got to. Everyone else in the room sees your figure walk as you do, with nothing new to set up.
+- **After joining, starting the walk is obvious.** Once the scan is ready, a supported phone gets one clear *Walk it* action with a short explanation. Tap it to allow tracking; just opening the room does not silently start the camera-based walk. Touch controls remain available instead.
+  ```screen
+  <div class="col gap">
+    <div class="card col gap phone">
+      <h3>Before</h3><div class="bar">the scanned home</div>
+      <div class="row gap"><button class="btn-ghost">Hands on</button><button class="btn-ghost">Walk it</button></div>
+      <p class="muted">Keyboard instructions, with no explanation of phone movement.</p>
+    </div>
+    <div class="card col gap phone">
+      <h3>Move with your phone</h3>
+      <div class="bar">the scanned home</div>
+      <p>Turn to look and take a step to move. Check the space around you first.</p>
+      <button class="btn-primary">Walk it</button>
+      <p class="muted">Or use the thumb pad and drag to look.</p>
+    </div>
+  </div>
+  ```
+
+- **Your picture and your place agree as you move and turn.** Start from the view you already chose, at the same height and facing. A step forward or sideways moves that way in the scan, and turning turns your view without shifting your position. The same movement is sent to everyone else, rather than an old stationary position competing with it.
   ```mermaid
-  flowchart LR
-    walk["press Walk it"] --> step["your steps move you"]
-    step --> again["press Carry on"] --> step
+  flowchart TD
+    phone["phone position and facing"] --> place["one starting point"]
+    place --> view["your view in the scan"]
+    place --> people["where others see you"]
+  ```
+
+- **Starting, carrying on and stopping never jump you elsewhere.** *Carry on from here* resets the tracking reference without moving or turning the view. *Stop* returns to touch controls at the place and facing you reached. This is not a promise that recentering creates more physical floor space.
+  ```screen
+  <div class="card col gap phone">
+    <span class="tag">walking</span><div class="bar">the scanned home</div>
+    <p>Turn to look. Stay within a clear space.</p>
+    <button class="btn-primary">Carry on from here</button>
+    <button class="btn-ghost">Stop</button>
+  </div>
+  ```
+
+- **The page says when it cannot follow you.** Loading and waiting for tracking are visible. If tracking is lost, no invented movement is sent; it resumes only from a valid position, or the walk ends with an explanation. A phone that cannot start keeps its touch controls and says why.
+  ```screen
+  <div class="col gap">
+    <div class="card col gap phone"><h3>Getting ready</h3><div class="skeleton">Loading the scan</div><p class="muted">Movement starts when the scan is ready.</p></div>
+    <div class="card col gap phone"><h3>Starting your walk</h3><p>Waiting for the phone to find its position…</p><button class="btn-ghost">Stop</button></div>
+    <div class="card col gap phone"><h3>Tracking paused</h3><p>Hold still while the phone finds its position.</p><button class="btn-primary">Stop</button></div>
+    <div class="card col gap phone"><h3>Could not start the walk</h3><p>Your view has not moved. You can still use touch controls.</p><button class="btn-primary">Try again</button></div>
+    <div class="card col gap phone"><h3>Walking is unavailable</h3><p>This browser cannot track your position. Use the thumb pad and drag to look.</p><div class="bar">the scanned home with touch controls</div></div>
+  </div>
   ```
 
 - **Every phone in a room can finally move.** A thumb pad sits in the corner of the view: press it to walk, drag anywhere else to look. Today a phone guest can only look around from one spot, because moving needs keys a phone does not have. The pad is there whether or not the phone can do the walking version.
@@ -45,11 +85,12 @@ Non-goals: the phone in the home drawing anything, turning a drawing on and off 
 
 ### New Capabilities
 
-- `roam-ar-view`: the scan walked with your own body, for a guest who joined from anywhere else on a phone that can track itself — placed against where their view already stood, moving with the phone's own pose, drawn within what the phone can carry, and handing them back to the page when it cannot.
+None beyond the existing walking capability.
 
 ### Modified Capabilities
 
-- `roam-scene`: how a person moves through the scan grows beyond the keyboard — a thumb pad on a touch screen, the phone's own movement in a session, and the laptop camera's reading of where the viewer's head is.
+- `roam-ar-view`: make the existing guest walk discoverable and consistent across the drawn view and shared pose, preserve position and heading at every handoff, and expose tracking readiness and loss.
+- `roam-scene`: how a person moves through the scan grows beyond the keyboard — a thumb pad on a touch screen and the phone's own movement in a session. Head-following remains cut.
 
 ## Impact
 
@@ -61,6 +102,7 @@ Non-goals: the phone in the home drawing anything, turning a drawing on and off 
 - **No new packages.** Three.js already carries WebXR, the installed Spark already draws through `renderer.xr.getCamera()`, and MediaPipe's vision tasks are already a dependency for hands.
 - No server side, no migration, no schema change. A guest's place in the room still goes up as the same position ten times a second, whatever moved them, so nobody else's page changes at all.
 - Worth knowing: the `roam-body` branch (pull request 10) is open against `RoomViewer.tsx` and `Scan.tsx`, the two files the room's movement touches. Different intent, same files.
+- Priority corrections touch the guest's transform and its inverse, the `use-room-ar.ts` lifecycle, the walking entry in `Scan.tsx`, and arbitration with `RoomViewer.tsx`. Preserve the capture-only transforms used by `Phone.tsx` and `Leave.tsx`. Existing uncommitted local-development and unrelated plan edits stay intact.
 
 ## Decision log
 
@@ -115,3 +157,25 @@ Non-goals: the phone in the home drawing anything, turning a drawing on and off 
 - **2026-10-25** — **Measured on the laptop, paused pass, and it names the cause: contention, not a slow model.** A face read costs **33 ms with the machine to itself** (worst 199 ms) against **347 ms while the splats draw** (worst 6,734 ms), and the drawing fell to 0–6 fps with the reader on, against 1–60 without. The model would fit the 66 ms cadence alone; it cannot share this GPU with the scan.
 - **2026-10-25** — Named rather than glossed: the probe drew at the viewer's old full-detail settings, which is a setting nobody will run now that the view steps down to 250k, 120k or 60k splats. So face-reading beside a *stepped-down* scan is still unmeasured, and that is the only configuration leaning would live in.
 - **2026-10-25** — Asked, on those numbers → **cut the leaning.** The model fits the cadence alone, but beside the splats it costs 347 ms a read and drops the view to 0–6 fps, which is the exact headroom the frame-rate step-down was built to win back. Reading a face beside a stepped-down scan was offered as a fairer measurement and declined; the `face:` line was also never confirmed to track a leaning head, so the signal itself was unproven. The laptop keeps the keys, the mouse and a view that holds up.
+- **2026-10-25** — Asked which phone and browser the priority fix must serve → chose Android Chrome.
+- **2026-10-25** — Asked whether the person is in the scanned room or somewhere else → chose somewhere else. This is the joined guest's view, not the real-room camera calibration in `roam-tracking`.
+- **2026-10-25** — Asked where to continue given overlapping walking work → chose keep going here; leave the other workspace's changes untouched.
+- **2026-10-25** — Asked what to do after exploring the priority fix → chose Plan it. No implementation or publishing is authorized by this answer.
+- **2026-10-25** — Assumed: update this existing walking plan rather than create another, because the requested behavior and affected guest flow are already its responsibility.
+- **2026-10-25** — Assumed: keep one explicit tracking-start tap after the joined scan is ready, but make it prominent, because the browser requires user activation and joining alone cannot be advertised as tracking.
+- **2026-10-25** — Assumed: regression tests must cover nonzero starting position and yaw, eye height, and stopping after a turn. Source inspection found that reported poses subtract an origin but the drawn scan does not, the first reported height becomes the floor, and `poseFacing` uses positive-Z forward while the camera's Euler yaw uses negative-Z forward. These observations are not a reproduction on the user's phone.
+- **2026-10-25** — Assumed: only the active movement mode may publish a pose. `Scan.tsx` currently wires both the ordinary viewer and the walk to `tell`; whether both loops run on a particular phone is unmeasured, so correctness must not depend on browser suspension.
+- **2026-10-25** — Assumed: the physical acceptance walk is from another location and checks view-to-peer agreement, not alignment with real scanned walls, because the user's answer makes real-room calibration out of scope.
+- **2026-10-25** — Asked whether to build the reviewed priority fix → chose “build it.” Implementation is authorized; production publishing was not requested.
+- **2026-10-25** — Verified before fixing: three new hook assertions failed on the original code. The first and returning eye height fell by 1.2 scan units, and the returned camera direction was exactly opposite the expected direction.
+- **2026-10-25** — Built: the rendered transform now includes the same raw origin used for reported poses; guest anchors retain eye height; the return-view conversion adapts camera Euler yaw to the existing scan-bearing convention without changing capture-only placement. Repeated recentering after steps and turns preserves all four pose fields.
+- **2026-10-25** — Built: the walk owns outgoing poses while active; ordinary drawing and inputs pause, and old callbacks stay blocked until the reached view is restored. Start cancellation, late callbacks, missing overlay, reference reset, lost tracking, setup failure and repeated stop are covered.
+- **2026-10-25** — Assumed: use `XRFrame.getPose(viewerSpace, referenceSpace)` only for validity in the renderer-owned loop, because installed Three.js r180 retains a stale camera when its own viewer-pose read fails. It avoids a second `getViewerPose` call. The mocked tests prove null/emulated handling; the complete phone flow still owes device evidence.
+- **2026-10-25** — Source review: pending scan initialization must finish before disposing that mesh; disposing early clears fields its loader still needs. A load-in-progress flag prevents recentering from starting duplicate loads, and success or failure after stopping releases the pending mesh. Self-review completed; no independent reviewer was run.
+- **2026-10-25** — Local evidence: the ROAM suite passed 319 tests across 40 files with 100% lines, branches, functions and statements. An additional repeated-recenter regression was then added and all 19 hook tests passed. Type checking and the app build passed; seven runtime tests, unused-code, duplicate-code, app-key and skill-action checks passed.
+- **2026-10-25** — Check limits: the last whole-app run passed 908 tests and failed four. Three failures are Windows path-separator assumptions in unchanged style/Worker guard tests; the fourth was the rendering setting/test mismatch, subsequently resolved by the concurrent task and confirmed by the passing ROAM suite. The repository wrapper cannot spawn npm on this Windows host and its wiki link checker reports existing links as absent. A later lint run failed on a three-line comment added concurrently in `detail.ts`; this task did not edit that file or weaken any check.
+- **2026-10-25** — Delivery remains open: no saved revision, shared check result, deployed preview, screenshots or real-phone walk is claimed. Test-deployment authorization is needed before pushing/deploying; physical acceptance, camera continuity and measured scale remain unticked. Concurrent local-development edits were preserved.
+- **2026-10-25** — Asked to finish the checks and prepare a test deployment → approved fixing the comment-lint error, committing and pushing for shared checks, and deploying to staging only. Production stays unchanged.
+- **2026-10-25** — Another task switched the shared checkout to `roam-local-dev` before anything was committed here. Asked how to isolate the work → approved a separate checkout. Copied the movement changes into the existing `roam-ar-view` branch in an isolated worktree; the shared checkout was left untouched.
+- **2026-10-25** — Retained the concurrent rendering correction and its paired assertion because this walk depends on a visible scan: `detail.ts` keeps Spark's LOD path enabled for its LOD-loaded mesh. Its comment had already been shortened by the other task; this checkpoint removes the reference to that task's uncommitted wiki page. The separate local-development scripts, configuration, tests, plan and wiki pages are not part of this checkpoint.
+- **2026-10-25** — The isolated checkout passed lint, type checking and all 320 ROAM tests with 100% lines, branches, functions and statements. Its first run exposed a timing-sensitive App test: it queried a single status while capability checking and scan loading were both visible. The helper now waits for capability checking to finish before making the unchanged loading assertions; no check was removed.

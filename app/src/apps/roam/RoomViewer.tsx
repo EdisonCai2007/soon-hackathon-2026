@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { PerspectiveCamera, Scene as World, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
 import { SparkRenderer, type SplatMesh } from '@sparkjsdev/spark'
 import { makeCastStage, type Cast, type CastStage } from './casting-stage'
@@ -34,6 +34,7 @@ type Props = {
   voice?: NoteVoice | null
   /** Where this page's own person stands, ten times a second, for the others to draw. */
   onStance?: (stance: Stance) => void
+  paused?: boolean
   /** The techniques running right now, drawn where whoever cast them stands. */
   casts?: readonly Cast[]
 }
@@ -44,7 +45,7 @@ const hasWebGL = () => document.createElement('canvas').getContext('webgl2') !==
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
 export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], notes = [], audio = null, onPick, voice = null,
-  onStance, casts = [] }: Props) {
+  onStance, paused = false, casts = [] }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const wash = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
@@ -52,8 +53,8 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
   const [touched, setTouched] = useState(false)
   const push = useRef<Push>(STILL)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, notes, onPick, voice, onStance, casts })
-  useEffect(() => { latest.current = { peers, notes, onPick, voice, onStance, casts } })
+  const latest = useRef({ peers, notes, onPick, voice, onStance, casts, paused })
+  useLayoutEffect(() => { latest.current = { peers, notes, onPick, voice, onStance, casts, paused } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -73,6 +74,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
     const world = new World()
     const camera = new PerspectiveCamera(55, 1, 0.03, 100)
     const controls = new PovControls(camera, renderer.domElement)
+    controls.setEnabled(!latest.current.paused)
     const spark = new SparkRenderer({ renderer })
     world.add(spark)
     const resize = () => {
@@ -106,7 +108,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
     const picked = (event: PointerEvent) => {
       const stage = viewer.current?.stage
       const pick = latest.current.onPick
-      if (!stage || !pick) return
+      if (!stage || !pick || latest.current.paused) return
       const found = stage.pick(pointerAt(event, renderer.domElement.getBoundingClientRect(), pointer), camera)
       if (found) pick(found, cameraPose(camera))
     }
@@ -135,6 +137,11 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       let told: number | null = null
       const watch = watchDetail(detailed)
       renderer.setAnimationLoop((time) => {
+        if (latest.current.paused) {
+          previous = null
+          push.current = STILL
+          return
+        }
         watch.frame(time)
         controls.push(push.current)
         controls.update(previous === null ? 0 : (time - previous) / 1000)
@@ -174,12 +181,19 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
     }
   }, [sceneUrl, splatUrl, onEvent, audio])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const current = viewer.current
     if (!pose || !current) return
     applyPose(current.camera, pose)
     current.controls.sync()
-  }, [pose])
+    if (!paused) latest.current.onStance?.(stanceOf(current.camera))
+  }, [pose, paused])
+
+  useLayoutEffect(() => {
+    const controls = viewer.current?.controls
+    if (!controls) return
+    controls.setEnabled(!paused)
+  }, [paused])
 
   // Who is in the room changes as people come and go; the figures follow.
   useEffect(() => { viewer.current?.stage?.sync(peers) }, [peers])
@@ -193,6 +207,6 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
 
   return <div ref={host} className="absolute inset-0" onPointerDown={touch}>
     <div ref={wash} className="pointer-events-none absolute inset-0 z-10 bg-white opacity-0" aria-hidden="true" />
-    {touched && <ThumbPad onPush={(moved) => { push.current = moved }} />}
+    {touched && !paused && <ThumbPad onPush={(moved) => { push.current = moved }} />}
   </div>
 }

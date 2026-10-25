@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
+import { Group, PerspectiveCamera, Vector3 } from 'three'
 import { placingFor, sessionSpot } from './ar-place'
-import { anchorAt, toScanPose, unitsPerMetre } from './placement'
+import { anchorAt, fromOrigin, toScanPose, unitsPerMetre } from './placement'
 import { parseScene } from './scene'
 
 const details: unknown = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../public/apps/roam/scene.json'), 'utf8'))
@@ -51,5 +52,40 @@ it('is the inverse of the placing a note uses, from a taped spot and from a view
     near(back.x, walked.x)
     near(back.y, walked.y)
     near(back.z, walked.z)
+  }
+})
+
+it('maps arbitrary tracked origins back to the same rendered position and heading', () => {
+  const origin = { x: 2, y: 1.7, z: -3, yaw: 0.8 }
+  for (const floor of scene.floors!) {
+    const start = { x: -1, floor: floor + 1.4, z: 4, yaw: -1.1 }
+    const placing = placingFor(start, scene, origin)
+    const outer = new Group()
+    const inner = new Group()
+    outer.add(inner)
+    outer.position.fromArray(placing.outer)
+    outer.rotation.y = placing.yaw
+    outer.scale.setScalar(placing.scale)
+    inner.position.fromArray(placing.inner)
+    outer.updateMatrixWorld(true)
+    for (const pose of [origin, { ...origin, x: 3, z: -4, y: 2, yaw: 2.4 }]) {
+      const scan = toScanPose(fromOrigin(pose, origin), start, scene)
+      const back = new Vector3(scan.x, scan.y, scan.z).applyMatrix4(inner.matrixWorld)
+      expect(back.distanceTo(new Vector3(pose.x, pose.y, pose.z))).toBeLessThan(1e-6)
+      const calculated = sessionSpot(scan, placing)
+      expect(back.distanceTo(new Vector3(calculated.x, calculated.y, calculated.z))).toBeLessThan(1e-6)
+      const camera = new PerspectiveCamera()
+      camera.rotation.set(0, scan.yaw, 0, 'YXZ')
+      const direction = camera.getWorldDirection(new Vector3()).transformDirection(inner.matrixWorld)
+      camera.rotation.y = pose.yaw
+      expect(direction.distanceTo(camera.getWorldDirection(new Vector3()))).toBeLessThan(1e-6)
+    }
+    const ahead = {
+      ...origin, x: origin.x - Math.sin(origin.yaw), z: origin.z - Math.cos(origin.yaw),
+    }
+    const scan = toScanPose(fromOrigin(ahead, origin), start, scene)
+    near(scan.x, start.x - Math.sin(start.yaw) * unitsPerMetre(scene))
+    near(scan.z, start.z - Math.cos(start.yaw) * unitsPerMetre(scene))
+    near(scan.y, start.floor)
   }
 })

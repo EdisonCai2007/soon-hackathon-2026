@@ -11,8 +11,8 @@ export type Detail = {
   stdDev: number
 }
 
-/** Heaviest first: fewer splats, bigger on screen, fewer pixels. `lod` stays on at every step, because the scan is a
- *  LOD tree and Spark draws one only through that path; "everything" is that path with no cap: wiki level-of-detail. */
+/** Heaviest first: each step draws fewer splats and fills fewer pixels. Spark needs LOD enabled at every step
+ *  because the scan is loaded as a level-of-detail tree; disabling it leaves this scan invisible. */
 export const STEPS: readonly Detail[] = [
   { name: 'everything', lod: true, splats: 0, renderScale: 1, pixels: 1.5, stdDev: Math.sqrt(8) },
   { name: '250k splats', lod: true, splats: 250_000, renderScale: 2, pixels: 1.25, stdDev: Math.sqrt(8) },

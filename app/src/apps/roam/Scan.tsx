@@ -69,8 +69,17 @@ type Act = (event: ViewerEvent) => void
 /** Walking the scan with your own feet, where the phone can follow them. It takes where the view already
  *  stands as its starting point, so it waits for the viewer to say where that is. */
 function Walk({ walk, stance }: { walk: RoomAr; stance: Stance | null }) {
-  if (!walk.offered || walk.walking || !stance) return null
-  return <Button type="button" variant="outline" onClick={() => walk.start(stance)}>Walk it</Button>
+  if (walk.walking) return null
+  if (walk.checking) return <p role="status" className="text-sm text-muted-foreground">Checking phone movement…</p>
+  if (!walk.offered) return <p className="text-sm text-muted-foreground">
+    Physical walking is unavailable in this browser. Use touch controls or the keyboard.
+  </p>
+  if (!stance) return <p role="status" className="text-sm text-muted-foreground">Movement starts when the scan is ready.</p>
+  return <div className="grid gap-2">
+    <Button type="button" onClick={() => walk.start(stance)}>Walk it</Button>
+    <p className="text-sm text-muted-foreground">Turn to look and take a step to move. Check the space around you first.</p>
+    <p className="text-sm text-muted-foreground">Or use the thumb pad and drag to look.</p>
+  </div>
 }
 
 function Bar({ ready, live, act, box, notes, walk, stance }:
@@ -81,13 +90,13 @@ function Bar({ ready, live, act, box, notes, walk, stance }:
     <NoteCount notes={notes} />
     {live?.soundBlocked && <Badge variant="outline">sound off</Badge>}
     {live && <Hands casting={live.casting} />}
-    <Walk walk={walk} stance={stance} />
     <div className="ml-auto flex flex-wrap gap-2">
       {VIEWS.map(([view, label]) => (
-        <Button key={label} type="button" variant="outline" disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Button>
+        <Button key={label} type="button" variant="outline" disabled={!ready || walk.walking} onClick={() => act({ type: 'go', view })}>{label}</Button>
       ))}
       <Button type="button" variant="ghost" onClick={() => fill(box)}>Full screen</Button>
     </div>
+    <div className="w-full"><Walk walk={walk} stance={stance} /></div>
   </div>
 }
 
@@ -97,7 +106,7 @@ function Cameras({ ready, act }: { ready: Ready; act: Act }) {
     <NativeSelect id="roam-camera" disabled={!ready} value={ready?.camera ?? ''} onChange={(event) => act({ type: 'go', view: Number(event.target.value) })}>
       {ready?.scene.cameras.map((camera, index) => <NativeSelectOption key={camera.name} value={index}>{camera.name}</NativeSelectOption>)}
     </NativeSelect>
-    <p className="text-sm text-muted-foreground">Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster</p>
+    <p className="text-sm text-muted-foreground">Touch: use the thumb pad to move · drag to look. Keyboard: W/A/S/D to move · Q/E down and up · Shift to go faster</p>
   </div>
 }
 
@@ -137,15 +146,16 @@ type ViewProps = {
   onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
   stance: Stance | null
   onStance: (stance: Stance) => void
+  paused: boolean
 }
 
 /** The scan itself, with the techniques running over it and where this person's own view stands. */
-function View({ app, live, scene, pose, act, notes, voice, onPick, stance, onStance }: ViewProps) {
+function View({ app, live, scene, pose, act, notes, voice, onPick, stance, onStance, paused }: ViewProps) {
   const casts = useCasts(live?.peers, live?.casting.mine, stance)
   useTechniqueSounds(live?.audio, casts, scene, stance)
   return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
     peers={live?.peers} notes={notes} audio={live?.audio} voice={voice} casts={casts} onPick={onPick}
-    onStance={onStance} />
+    onStance={onStance} paused={paused} />
 }
 
 /** While the walk runs, the session owns the screen, so these are the page's only visible controls. */
@@ -153,9 +163,13 @@ function Walking({ walk, overlay }: { walk: RoomAr; overlay: RefObject<HTMLDivEl
   // The element stays in the page whether or not a session is running, so React keeps owning it.
   return <div ref={overlay} className={walk.walking ? 'fixed inset-x-0 bottom-0 z-30 grid gap-3 bg-black/70 p-4' : 'hidden'}>
     {walk.walking && <>
-      <p role="status" className="text-white">You’re in the home. Turn your body to look, and walk.</p>
+      <p role="status" className="text-white">{walk.phase === 'starting'
+        ? 'Waiting for the phone to find its position…'
+        : walk.phase === 'lost' ? 'Tracking paused. Hold still while the phone finds its position.'
+          : 'You’re in the home. Turn your body to look, and walk.'}</p>
+      {walk.progress !== 1 && <p role="status" className="text-white">{loadingLabel(walk.progress)}</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={walk.carryOn}>Carry on from here</Button>
+        <Button type="button" disabled={walk.phase !== 'walking'} onClick={walk.carryOn}>Carry on from here</Button>
         <Button type="button" variant="outline" onClick={walk.stop}>Stop</Button>
       </div>
     </>}
@@ -178,7 +192,7 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
   const overlay = useRef<HTMLDivElement>(null)
   const tell = live?.tell
   const walk = useRoomAr(`/apps/${app}/room.spz`, scene, {
-    onStance: tell,
+    onStance: useCallback((here: Stance) => { setStance(here); tell?.(here) }, [tell]),
     onLeft: useCallback((pose: Pose) => dispatch({ type: 'look', pose }), []),
     overlay,
   })
@@ -201,13 +215,17 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
       <Bar ready={ready} live={live} act={dispatch} box={box} notes={notes} walk={walk} stance={stance} />
       {before}
       {walk.trouble && <p role="alert" className="mb-3 text-sm text-muted-foreground">{walk.trouble}</p>}
-      <Cameras ready={ready} act={dispatch} />
+      <Cameras ready={walk.walking ? null : ready} act={dispatch} />
       {state.status === 'error' || state.status === 'no-webgl'
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
         : <div ref={setBox} className="relative h-[70vh] min-h-80 overflow-hidden rounded-xl border bg-[#10151c]">
           <View app={app} live={live} scene={scene} pose={ready?.pose ?? null} act={dispatch} notes={notes}
-            voice={voice} stance={stance}
-            onStance={(here) => { setStance(here); tell?.(here) }}
+            voice={voice} stance={stance} paused={walk.walking}
+            onStance={(here) => {
+              if (!walk.acceptsView(here)) return
+              setStance(here)
+              tell?.(here)
+            }}
             onPick={(picked, saved) => {
               if (picked.kind === 'note') return setOpened(picked.id)
               if (live) setWatching({ id: picked.id, saved })

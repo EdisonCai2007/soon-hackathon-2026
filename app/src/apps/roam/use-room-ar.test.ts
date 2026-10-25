@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { act, renderHook } from '@testing-library/react'
+import { PerspectiveCamera, Vector3 } from 'three'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ArViewHooks } from './ar-view'
 import type { Pose as Stance } from './messages'
 import { anchorAt, unitsPerMetre } from './placement'
-import { parseScene } from './scene'
+import { applyPose, parseScene } from './scene'
 import { useRoomAr } from './use-room-ar'
 
 const made = vi.hoisted(() => ({
@@ -17,17 +18,21 @@ const made = vi.hoisted(() => ({
   started: [] as { overlay: unknown; onEnd: () => void }[],
   supported: true,
   refuse: false,
+  overlaid: true,
+  failView: false,
+  pending: null as Promise<void> | null,
 }))
 
 vi.mock('./ar-session', () => ({
   arSupported: vi.fn(async () => made.supported),
   startAr: vi.fn(async (hooks: { onPose: (pose: unknown) => void; onLost: () => void; onEnd: () => void }, overlay: unknown) => {
+    if (made.pending) await made.pending
     if (made.refuse) throw new Error('refused')
     // A session handed a drawing reports through it, so these two are handed in and never used: proved here.
     hooks.onPose({ x: 0, y: 0, z: 0, yaw: 0 })
     hooks.onLost()
     made.started.push({ overlay, onEnd: hooks.onEnd })
-    const session = { stop: vi.fn(), overlaid: true }
+    const session = { stop: vi.fn(), overlaid: made.overlaid }
     made.sessions.push(session)
     return session
   }),
@@ -35,6 +40,7 @@ vi.mock('./ar-session', () => ({
 
 vi.mock('./ar-view', () => ({
   makeArView: vi.fn((_url: string, hooks: ArViewHooks) => {
+    if (made.failView) throw new Error('no context')
     const view = { hooks, lineUp: vi.fn(), dispose: vi.fn(), show: vi.fn(), shown: () => true, take: vi.fn() }
     made.views.push(view)
     return view
@@ -59,6 +65,10 @@ afterEach(() => {
   made.started.length = 0
   made.supported = true
   made.refuse = false
+  made.overlaid = true
+  made.failView = false
+  made.pending = null
+  vi.useRealTimers()
 })
 
 const open = (hooks: Parameters<typeof useRoomAr>[2] = {}) => {
@@ -88,12 +98,15 @@ it('starts from where the view already stood, and says so to the room ten times 
   expect(walking.walk().walking).toBe(true)
   await settle()
   expect(made.started[0].overlay).toBe(overlay.current)
-  expect(latest().lineUp).toHaveBeenCalledWith({ x: spot.x, z: spot.z, yaw: spot.yaw, floor: spot.floor }, scene)
+  expect(latest().lineUp).not.toHaveBeenCalled()
 
   // The first pose is the starting point itself, so it reports exactly where the view was looking from.
   act(() => latest().hooks.onPose!({ x: 0, y: 1.2, z: 0, yaw: 0 }))
+  expect(latest().lineUp).toHaveBeenCalledWith({ x: spot.x, z: spot.z, yaw: spot.yaw, floor: standing.y }, scene,
+    { x: 0, y: 1.2, z: 0, yaw: 0 })
   const first = onStance.mock.calls[0][0] as Stance
   expect(first.x).toBeCloseTo(spot.x, 6)
+  expect(first.y).toBeCloseTo(standing.y, 6)
   expect(first.z).toBeCloseTo(spot.z, 6)
   expect(first.yaw).toBeCloseTo(spot.yaw, 6)
 
@@ -123,7 +136,8 @@ it('carries on from where the real floor ran out, keeping the place in the home'
 
   act(() => walking.walk().carryOn())
   expect(latest().lineUp).toHaveBeenLastCalledWith(
-    { x: reached.x, z: reached.z, yaw: reached.yaw, floor: spot.floor }, scene)
+    { x: reached.x, z: reached.z, yaw: reached.yaw, floor: reached.y }, scene,
+    { x: 0, y: 1.2, z: 2, yaw: 0 })
   // Standing still after carrying on leaves them exactly where they had reached.
   clock = 400
   act(() => latest().hooks.onPose!({ x: 0, y: 1.2, z: 2, yaw: 0 }))
@@ -146,6 +160,46 @@ it('comes back to the page looking where the walk got to', async () => {
   expect(walking.walk().trouble).toBeNull()
   const back = onLeft.mock.calls[0][0] as { position: number[] }
   expect(back.position[0]).toBeCloseTo(spot.x, 6)
+  expect(back.position[1]).toBeCloseTo(standing.y, 6)
+})
+
+it('preserves the actual camera direction after a turned walk', async () => {
+  const onLeft = vi.fn()
+  const walking = open({ onLeft })
+  await settle()
+  act(() => walking.walk().start(standing))
+  await settle()
+  const origin = { x: 2, y: 1.6, z: -3, yaw: 0.7 }
+  act(() => latest().hooks.onPose!(origin))
+  act(() => latest().hooks.onPose!({ ...origin, yaw: origin.yaw + Math.PI / 2 }))
+  act(() => walking.walk().stop())
+  const camera = new PerspectiveCamera()
+  applyPose(camera, onLeft.mock.calls[0][0])
+  const expected = new PerspectiveCamera()
+  expected.rotation.set(0, standing.yaw + Math.PI / 2, 0, 'YXZ')
+  expect(camera.getWorldDirection(new Vector3()).distanceTo(expected.getWorldDirection(new Vector3()))).toBeLessThan(1e-6)
+})
+
+it('keeps position, height and heading through repeated recentering after steps and turns', async () => {
+  const onStance = vi.fn()
+  const walking = open({ onStance })
+  await settle()
+  act(() => walking.walk().start(standing))
+  await settle()
+  act(() => latest().hooks.onPose!({ x: 2, y: 1.6, z: -3, yaw: 0.7 }))
+  for (let step = 1; step <= 3; step += 1) {
+    const raw = { x: 2 + step, y: 1.6 + step / 10, z: -3 - step, yaw: 0.7 + step * 0.8 }
+    clock += 200
+    act(() => latest().hooks.onPose!(raw))
+    const reached = onStance.mock.calls.at(-1)![0] as Stance
+    act(() => walking.walk().carryOn())
+    expect(latest().lineUp).toHaveBeenLastCalledWith(
+      { x: reached.x, floor: reached.y, z: reached.z, yaw: reached.yaw }, scene, raw)
+    clock += 200
+    act(() => latest().hooks.onPose!(raw))
+    const after = onStance.mock.calls.at(-1)![0] as Stance
+    for (const key of ['x', 'y', 'z', 'yaw'] as const) expect(after[key]).toBeCloseTo(reached[key], 10)
+  }
 })
 
 it('ends the walk and says why when the phone cannot carry it, or loses the view', async () => {
@@ -213,4 +267,138 @@ it('carries on only while a walk is running', async () => {
   await settle()
   act(() => walking.walk().carryOn())
   expect(made.views).toHaveLength(0)
+})
+
+it('waits for a position, pauses lost tracking, and stops prolonged loss', async () => {
+  vi.useFakeTimers()
+  const onStance = vi.fn()
+  const walking = open({ onStance })
+  await settle()
+  act(() => walking.walk().start(standing))
+  await settle()
+  expect(walking.walk().phase).toBe('starting')
+  act(() => latest().hooks.onTracking!(false))
+  act(() => walking.walk().carryOn())
+  expect(latest().lineUp).not.toHaveBeenCalled()
+  act(() => latest().hooks.onProgress!(0.5))
+  expect(walking.walk().progress).toBe(0.5)
+  act(() => latest().hooks.onTracking!(true))
+  act(() => latest().hooks.onPose!({ x: 2, y: 1.4, z: -3, yaw: 0.7 }))
+  expect(walking.walk().phase).toBe('walking')
+  act(() => latest().hooks.onTracking!(false))
+  expect(walking.walk().phase).toBe('lost')
+  act(() => walking.walk().carryOn())
+  expect(latest().lineUp).toHaveBeenCalledTimes(1)
+  act(() => latest().hooks.onTracking!(true))
+  act(() => latest().hooks.onTracking!(false))
+  act(() => vi.advanceTimersByTime(10_000))
+  expect(walking.walk().walking).toBe(false)
+  expect(walking.walk().trouble).toMatch(/lost its position/)
+  expect(onStance).toHaveBeenCalledTimes(1)
+})
+
+it('restores ordinary reporting only at the reached position and heading', async () => {
+  const walking = open()
+  await settle()
+  expect(walking.walk().acceptsView(standing)).toBe(true)
+  act(() => walking.walk().start(standing))
+  await settle()
+  expect(walking.walk().acceptsView(standing)).toBe(false)
+  act(() => latest().hooks.onPose!({ x: 2, y: 1.4, z: -3, yaw: 0.7 }))
+  act(() => walking.walk().stop())
+  expect(walking.walk().acceptsView({ ...standing, x: 99 })).toBe(false)
+  expect(walking.walk().acceptsView({ ...standing, yaw: standing.yaw + 1 })).toBe(false)
+  expect(walking.walk().acceptsView(standing)).toBe(true)
+  expect(walking.walk().acceptsView({ ...standing, x: 99 })).toBe(true)
+})
+
+it('cleans up a missing overlay or a constructor failure', async () => {
+  const walking = open()
+  await settle()
+  made.overlaid = false
+  act(() => walking.walk().start(standing))
+  await settle()
+  expect(walking.walk().trouble).toMatch(/controls/)
+  expect(made.sessions[0].stop).toHaveBeenCalled()
+  made.failView = true
+  act(() => walking.walk().start(standing))
+  expect(walking.walk().trouble).toMatch(/wouldn’t start/)
+})
+
+it('ignores old frames and a cancelled start after a new walk begins', async () => {
+  const onStance = vi.fn()
+  const walking = open({ onStance })
+  await settle()
+  let resolve!: () => void
+  made.pending = new Promise<void>((done) => { resolve = done })
+  act(() => walking.walk().start(standing))
+  const old = latest()
+  act(() => walking.walk().stop())
+  made.pending = null
+  act(() => walking.walk().start(standing))
+  await settle()
+  act(() => old.hooks.onPose!(standing))
+  act(() => old.hooks.onTracking!(false))
+  act(() => old.hooks.onProgress!(0.9))
+  act(() => old.hooks.onGaveUp!('lost'))
+  expect(onStance).not.toHaveBeenCalled()
+  await act(async () => { resolve(); await Promise.resolve() })
+  expect(made.sessions[1].stop).toHaveBeenCalled()
+  act(() => made.started[1].onEnd())
+  expect(walking.walk().walking).toBe(true)
+  act(() => latest().hooks.onPose!(standing))
+  expect(onStance).toHaveBeenCalledTimes(1)
+})
+
+it('ends a hidden walk and ignores visibility changes while idle', async () => {
+  const walking = open()
+  await settle()
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+  act(() => document.dispatchEvent(new Event('visibilitychange')))
+  act(() => walking.walk().start(standing))
+  await settle()
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+  act(() => document.dispatchEvent(new Event('visibilitychange')))
+  expect(walking.walk().trouble).toMatch(/lost its position/)
+})
+
+it('ignores an unsupported start and capability results after unmount', async () => {
+  made.supported = false
+  const unsupported = open()
+  await settle()
+  act(() => unsupported.walk().start(standing))
+  expect(made.views).toHaveLength(0)
+  const pending = open()
+  pending.unmount()
+  await settle()
+})
+
+it('accepts tracking arriving before session setup resolves and resets the send gate on restart', async () => {
+  const onStance = vi.fn()
+  const walking = open({ onStance })
+  await settle()
+  act(() => walking.walk().start(standing))
+  act(() => latest().hooks.onPose!(standing))
+  await settle()
+  act(() => latest().hooks.onTracking!(true))
+  act(() => walking.walk().stop())
+  act(() => walking.walk().start(standing))
+  await settle()
+  act(() => latest().hooks.onPose!(standing))
+  expect(onStance).toHaveBeenCalledTimes(2)
+})
+
+it('ignores a rejected old start after another walk has begun', async () => {
+  const walking = open()
+  await settle()
+  let reject!: (error: Error) => void
+  made.pending = new Promise<void>((_resolve, fail) => { reject = fail })
+  act(() => walking.walk().start(standing))
+  act(() => walking.walk().stop())
+  made.pending = null
+  act(() => walking.walk().start(standing))
+  await settle()
+  await act(async () => { reject(new Error('cancelled')); await Promise.resolve() })
+  expect(walking.walk().walking).toBe(true)
+  expect(walking.walk().trouble).toBeNull()
 })

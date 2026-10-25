@@ -78,6 +78,14 @@ Three.js can own the session, which is the supported path and much less work tha
 
 Spark's level-of-detail tree only applies when the mesh is built with `lod: true` *and* the renderer is given `enableLod` with an `lodSplatCount`; miss either and every splat is drawn with nothing culled, which is what 2 frames a second looks like. The tree is computed in a worker from the same file in 4–5 seconds, so a trimmed copy of the scan is not needed.
 
+## Keep the tracked and drawn starting points identical
+
+A guest walking from somewhere else needs two saved poses: the scan viewpoint at the start tap, and the first valid phone pose. Subtract the phone origin, rotate by the difference in heading, scale into scan units, then add the saved scan position. Draw the world with the inverse of that same mapping. Recenter both together. Keeping an origin only in the reported position makes the picture disagree with everybody else's view.
+
+Preserve the saved **eye height**, not just the floor beneath it. A tracked height difference starts at zero; adding it to floor height puts the returning camera on the floor. Camera Euler yaw also looks along **negative Z**, while a bearing built from `target - position` looks along positive Z. Converting between those conventions needs a half turn. The [placement tests](../../app/src/apps/roam/ar-place.test.ts) and [camera-direction tests](../../app/src/apps/roam/use-room-ar.test.ts) check the actual transforms, not just callback arguments.
+
+Three.js r180 keeps the last camera pose when it has no new viewer pose. A moving camera is therefore not a tracking-validity signal, nor is a stationary one proof of failure. The guest renderer checks `XRFrame.getPose(viewerSpace, referenceSpace)` for a non-emulated position in the same frame loop, without a second `getViewerPose` call. This path is covered by [renderer tests](../../app/src/apps/roam/ar-view.test.ts); its behavior on the complete joined-phone flow still needs device confirmation. Earlier frame-rate probes did not verify it.
+
 ## Trying it on a real phone
 
 A page that asks for the camera needs HTTPS, so a laptop's dev server is not reachable from a phone as-is. `cloudflared tunnel --url http://localhost:<port>` gives a public HTTPS address in seconds with no account. Two things to get right in a throwaway test page: wait for the engine or session to be ready before enabling the button, since a phone connection can take a while over mobile data, and print the error rather than a generic failure — "it doesn't work" and "the script hadn't loaded yet" look identical otherwise.

@@ -173,3 +173,10 @@ it('starts anyway where there is no layer to attach, so one phone’s quirk is n
   await startAr(hooks())
   expect(older.fake.states).toEqual([])
 })
+
+it('ends the session when its drawing fails to initialize', async () => {
+  const { fake } = session()
+  const drawing = { take: vi.fn(async () => { throw new Error('no renderer') }) }
+  await expect(startAr(hooks(), null, drawing)).rejects.toThrow('no renderer')
+  expect(fake.end).toHaveBeenCalledTimes(1)
+})

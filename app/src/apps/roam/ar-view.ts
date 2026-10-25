@@ -15,15 +15,16 @@ export type ArViewHooks = {
   onProgress?: (fraction: number) => void
   /** Where the phone is each frame, taken from the camera three.js has already moved. */
   onPose?: (pose: Pose) => void
+  onTracking?: (tracked: boolean) => void
   /** The drawing could not go on: too slow to look at, or the 3D view was lost. */
-  onGaveUp?: (why: 'rate' | 'lost') => void
+  onGaveUp?: (why: 'rate' | 'lost' | 'tracking') => void
 }
 
 export type ArView = {
   /** Hands the session to three.js and starts drawing. */
   take: (session: XRSessionLike) => Promise<void>
   /** Puts the scan where this anchor says, so that place sits where the person is standing. */
-  lineUp: (anchor: Anchor, scene: Scene) => void
+  lineUp: (anchor: Anchor, scene: Scene, origin?: Pose) => void
   show: (on: boolean) => void
   shown: () => boolean
   dispose: () => void
@@ -59,8 +60,13 @@ export function makeArView(splatUrl: string, hooks: ArViewHooks = {}, shown = tr
   world.add(placed)
 
   let splats: SplatMesh | undefined
+  let loading = false
   let stopped = false
-  const gaveUp = (why: 'rate' | 'lost') => {
+  let failed = false
+  let detach = () => {}
+  const gaveUp = (why: 'rate' | 'lost' | 'tracking') => {
+    if (stopped || failed) return
+    failed = true
     placed.visible = false
     hooks.onGaveUp?.(why)
   }
@@ -85,39 +91,66 @@ export function makeArView(splatUrl: string, hooks: ArViewHooks = {}, shown = tr
       },
     })
     pivot.add(mesh)
-    await mesh.initialized
+    try {
+      await mesh.initialized
+    } catch (error) {
+      mesh.dispose()
+      throw error
+    }
     if (stopped) return mesh.dispose()
     splats = mesh
+    hooks.onProgress?.(1)
   }
 
   return {
     async take(session) {
+      if (stopped) return
       renderer.xr.setReferenceSpaceType('local-floor')
       await renderer.xr.setSession(session as unknown as ThreeSession)
+      if (stopped) return
+      const viewer = await session.requestReferenceSpace('viewer') as XRReferenceSpace
+      if (stopped) return
+      const reference = renderer.xr.getReferenceSpace()!
+      const reset = () => gaveUp('tracking')
+      reference.addEventListener('reset', reset)
+      detach = () => reference.removeEventListener('reset', reset)
       renderer.domElement.style.display = ''
-      renderer.setAnimationLoop((time) => {
+      renderer.setAnimationLoop((time, frame) => {
+        if (stopped || failed) return
         watch.frame(time)
+        if (stopped || failed) return
+        const tracked = frame.getPose(viewer, reference)
+        const valid = tracked != null && !tracked.emulatedPosition
+        hooks.onTracking?.(valid)
+        if (!valid || stopped) return
         const eye = renderer.xr.getCamera()
         eye.getWorldPosition(where)
         eye.getWorldQuaternion(turn)
         hooks.onPose?.({ x: where.x, y: where.y, z: where.z, yaw: facing.setFromQuaternion(turn, 'YXZ').y })
-        renderer.render(world, camera)
+        if (!stopped) renderer.render(world, camera)
       })
     },
 
-    lineUp(anchor, scene) {
-      const { inner, yaw, scale } = placingFor(anchor, scene)
+    lineUp(anchor, scene, origin) {
+      if (stopped) return
+      const { inner, outer, yaw, scale } = placingFor(anchor, scene, origin)
       pivot.position.fromArray(inner)
+      placed.position.fromArray(outer)
       placed.rotation.set(0, yaw, 0)
       placed.scale.setScalar(scale)
-      if (!splats) void load(scene).catch(() => { if (!stopped) gaveUp('lost') })
+      if (!loading) {
+        loading = true
+        void load(scene).catch(() => { if (!stopped) gaveUp('lost') })
+      }
     },
 
     show(on) { placed.visible = on },
     shown: () => placed.visible,
 
     dispose() {
+      if (stopped) return
       stopped = true
+      detach()
       renderer.setAnimationLoop(null)
       renderer.domElement.removeEventListener('webglcontextlost', lost)
       splats?.dispose()

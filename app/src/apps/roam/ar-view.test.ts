@@ -19,7 +19,7 @@ const fakes = vi.hoisted(() => ({
     setPixelRatio: ReturnType<typeof vi.fn>
     render: ReturnType<typeof vi.fn>
     dispose: ReturnType<typeof vi.fn>
-    xr: { enabled: boolean; setReferenceSpaceType: ReturnType<typeof vi.fn>; setSession: ReturnType<typeof vi.fn>; getCamera: () => Object3D }
+    xr: { enabled: boolean; setReferenceSpaceType: ReturnType<typeof vi.fn>; setSession: ReturnType<typeof vi.fn>; getCamera: () => Object3D; getReferenceSpace: () => EventTarget }
   }[],
   sparks: [] as { dispose: ReturnType<typeof vi.fn>; enableLod: boolean; lodSplatCount: number; maxStdDev: number }[],
   splats: [] as { options: { url: string; lod?: boolean; onProgress: (event: { loaded: number; total: number }) => void }; finish: () => void; fail: (error: Error) => void; dispose: ReturnType<typeof vi.fn> }[],
@@ -37,7 +37,9 @@ vi.mock('three', async (importOriginal) => {
     setAnimationLoop = vi.fn()
     render = vi.fn()
     dispose = vi.fn()
-    xr = { enabled: false, setReferenceSpaceType: vi.fn(), setSession: vi.fn(async () => {}), getCamera: () => eye }
+    reference = new EventTarget()
+    xr = { enabled: false, setReferenceSpaceType: vi.fn(), setSession: vi.fn(async () => {}), getCamera: () => eye,
+      getReferenceSpace: () => this.reference }
     constructor() { fakes.renderers.push(this) }
   }
   return { ...three, WebGLRenderer }
@@ -87,7 +89,11 @@ const session = (): XRSessionLike & { ended: () => void } => {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
-const loop = () => fakes.renderers[0].setAnimationLoop.mock.calls[0][0] as (time: number) => void
+const loop = () => {
+  const tick = fakes.renderers[0].setAnimationLoop.mock.calls[0][0] as (time: number, frame: object) => void
+  return (time: number, pose: { emulatedPosition: boolean } | null = { emulatedPosition: false }) =>
+    tick(time, { getPose: () => pose })
+}
 
 beforeEach(() => { vi.stubGlobal('devicePixelRatio', 3) })
 afterEach(() => {
@@ -180,7 +186,11 @@ it('gives up the drawing when the rate cannot be held, and when the 3D view is l
   const lost = new Event('webglcontextlost', { cancelable: true })
   fakes.renderers[0].domElement.dispatchEvent(lost)
   expect(lost.defaultPrevented).toBe(true)
+  expect(onGaveUp).toHaveBeenCalledTimes(1)
+  const second = makeArView('/apps/roam/room.spz', { onGaveUp })
+  fakes.renderers[1].domElement.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
   expect(onGaveUp).toHaveBeenLastCalledWith('lost')
+  second.dispose()
   view.dispose()
 })
 
@@ -201,6 +211,84 @@ it('says nothing once it is disposed, and lets go of a scan that arrives afterwa
   expect(onGaveUp).not.toHaveBeenCalled()
   expect(splats.dispose).toHaveBeenCalled()
   expect(fakes.renderers[0].setAnimationLoop).toHaveBeenLastCalledWith(null)
+})
+
+it('uses positional validity without publishing a stale camera or drawing on tracking loss', async () => {
+  const onPose = vi.fn()
+  const onTracking = vi.fn()
+  const onGaveUp = vi.fn()
+  const view = makeArView('/apps/roam/room.spz', { onPose, onTracking, onGaveUp })
+  await view.take(session())
+  const draw = loop()
+  draw(0, null)
+  draw(16, { emulatedPosition: true })
+  expect(onTracking.mock.calls).toEqual([[false], [false]])
+  expect(onPose).not.toHaveBeenCalled()
+  expect(fakes.renderers[0].render).not.toHaveBeenCalled()
+  draw(32)
+  expect(onPose).toHaveBeenCalledTimes(1)
+  fakes.renderers[0].xr.getReferenceSpace().dispatchEvent(new Event('reset'))
+  draw(48)
+  expect(onGaveUp).toHaveBeenCalledWith('tracking')
+  expect(onPose).toHaveBeenCalledTimes(1)
+  view.dispose()
+  view.dispose()
+  draw(64)
+  view.lineUp(anchor, scene)
+  fakes.renderers[0].xr.getReferenceSpace().dispatchEvent(new Event('reset'))
+  expect(onGaveUp).toHaveBeenCalledTimes(1)
+})
+
+it('places a guest origin in the rendered world and loads only once while pending', async () => {
+  const view = makeArView('/apps/roam/room.spz')
+  await view.take(session())
+  const origin = { x: 2, y: 1.6, z: -3, yaw: 0.9 }
+  view.lineUp(anchor, scene, origin)
+  view.lineUp(anchor, scene, origin)
+  expect(fakes.splats).toHaveLength(1)
+  const mesh = fakes.splats[0] as unknown as Object3D
+  mesh.parent!.updateWorldMatrix(true, true)
+  const placed = new Vector3(anchor.x, anchor.floor, anchor.z).applyMatrix4(mesh.parent!.matrixWorld)
+  expect(placed.distanceTo(new Vector3(origin.x, origin.y, origin.z))).toBeLessThan(1e-6)
+  view.dispose()
+  expect(fakes.splats[0].dispose).not.toHaveBeenCalled()
+  fakes.splats[0].finish()
+  await settle()
+  expect(fakes.splats[0].dispose).toHaveBeenCalledTimes(1)
+})
+
+it('does not restart a renderer disposed before or during session setup', async () => {
+  const before = makeArView('/apps/roam/room.spz')
+  before.dispose()
+  await before.take(session())
+  expect(fakes.renderers[0].xr.setSession).not.toHaveBeenCalled()
+  const during = makeArView('/apps/roam/room.spz')
+  const taking = during.take(session())
+  during.dispose()
+  await taking
+  expect(fakes.renderers[1].setAnimationLoop).not.toHaveBeenCalledWith(expect.any(Function))
+  const last = makeArView('/apps/roam/room.spz')
+  const pending = session()
+  let resolve!: (space: object) => void
+  pending.requestReferenceSpace = () => new Promise((done) => { resolve = done })
+  const waiting = last.take(pending)
+  await Promise.resolve()
+  last.dispose()
+  resolve({})
+  await waiting
+  expect(fakes.renderers[2].setAnimationLoop).not.toHaveBeenCalledWith(expect.any(Function))
+})
+
+it('stops the current frame if a tracking or pose callback ends the walk', async () => {
+  const view = makeArView('/apps/roam/room.spz', { onTracking: () => view.dispose() })
+  await view.take(session())
+  loop()(0)
+  expect(fakes.renderers[0].render).not.toHaveBeenCalled()
+  const other = makeArView('/apps/roam/room.spz', { onPose: () => other.dispose() })
+  await other.take(session())
+  const draw = fakes.renderers[1].setAnimationLoop.mock.calls[0][0] as (time: number, frame: object) => void
+  draw(0, { getPose: () => ({ emulatedPosition: false }) })
+  expect(fakes.renderers[1].render).not.toHaveBeenCalled()
 })
 
 it('minds its own business when the page is listening for nothing', async () => {
