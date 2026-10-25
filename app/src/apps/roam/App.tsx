@@ -1,3 +1,9 @@
+import '@fontsource/archivo/400.css'
+import '@fontsource/archivo/500.css'
+import '@fontsource/archivo/600.css'
+import '@fontsource/archivo/700.css'
+import '@fontsource/archivo/900.css'
+import '@fontsource/arimo/400.css'
 import { useNavigate, useParams } from 'react-router'
 import { StartRoom } from './Host'
 import { arrivalFrom } from './invite'
@@ -15,5 +21,5 @@ export function App() {
 
   if (arrival.kind === 'camera') return <Phone app={app} roomId={arrival.roomId} />
   if (arrival.kind === 'guest') return <Room app={app} roomId={arrival.roomId} />
-  return <Scan app={app} before={<div className="mb-3"><StartRoom app={app} onStarted={(roomId) => void navigate(`/apps/${app}/r/${roomId}`)} /></div>} />
+  return <Scan app={app} before={<StartRoom app={app} onStarted={(roomId) => void navigate(`/apps/${app}/r/${roomId}`)} />} />
 }

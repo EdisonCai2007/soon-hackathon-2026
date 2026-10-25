@@ -33,6 +33,16 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /* ROAM's own look, used only by its mini app: the workspace pages keep the colours above. */
+  --color-roam-cream: #fffcee;
+  --color-roam-peri: #7a86be;
+  --color-roam-ink: #2e3566;
+  --color-roam-red: #dd2320;
+  --color-roam-yellow: #f2c94c;
+  --color-roam-coral: #e27a55;
+  --color-roam-mist: #e6e8f3;
+  --font-roam: "Archivo", system-ui, sans-serif;
+  --font-roam-label: Arial, "Arimo", sans-serif;
 }
 
 /* shadcn's neutral light colours, the start on every device, then its dark set under `.dark`. The review page and the
