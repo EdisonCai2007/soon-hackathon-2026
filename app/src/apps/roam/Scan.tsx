@@ -66,11 +66,11 @@ const fill = (box: HTMLElement | null) => {
 type Ready = Extract<ViewerState, { status: 'ready' }> | null
 type Act = (event: ViewerEvent) => void
 
-/** Walking the scan with your own feet, where the phone can follow them. */
+/** Walking the scan with your own feet, where the phone can follow them. It takes where the view already
+ *  stands as its starting point, so it waits for the viewer to say where that is. */
 function Walk({ walk, stance }: { walk: RoomAr; stance: Stance | null }) {
-  if (!walk.offered || walk.walking) return null
-  return <Button type="button" variant="outline" disabled={!stance}
-    onClick={() => stance && walk.start(stance)}>Walk it</Button>
+  if (!walk.offered || walk.walking || !stance) return null
+  return <Button type="button" variant="outline" onClick={() => walk.start(stance)}>Walk it</Button>
 }
 
 function Bar({ ready, live, act, box, notes, walk, stance }:

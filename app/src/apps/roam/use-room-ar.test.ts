@@ -21,8 +21,11 @@ const made = vi.hoisted(() => ({
 
 vi.mock('./ar-session', () => ({
   arSupported: vi.fn(async () => made.supported),
-  startAr: vi.fn(async (hooks: { onEnd: () => void }, overlay: unknown) => {
+  startAr: vi.fn(async (hooks: { onPose: (pose: unknown) => void; onLost: () => void; onEnd: () => void }, overlay: unknown) => {
     if (made.refuse) throw new Error('refused')
+    // A session handed a drawing reports through it, so these two are handed in and never used: proved here.
+    hooks.onPose({ x: 0, y: 0, z: 0, yaw: 0 })
+    hooks.onLost()
     made.started.push({ overlay, onEnd: hooks.onEnd })
     const session = { stop: vi.fn(), overlaid: true }
     made.sessions.push(session)
