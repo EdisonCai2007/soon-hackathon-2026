@@ -4,9 +4,11 @@ import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark'
 import { PovControls } from './pov-controls'
 import { applyPose, cameraPose, displayQuaternion, parseScene, type Pose } from './scene'
 import { dueToSend } from './pose-feed'
-import { makeStage, pointerAt, stanceOf, type Stage } from './stage'
+import { makeStage, pointerAt, stanceOf, type Picked, type Stage } from './stage'
 import type { Peer } from './presence'
 import type { Pose as Stance } from './messages'
+import type { Note } from './notes'
+import type { NoteVoice } from './note-sound'
 import type { ViewerEvent } from './viewer-state'
 
 type Viewer = { camera: PerspectiveCamera; controls: PovControls; stage: Stage | null }
@@ -17,10 +19,14 @@ type Props = {
   onEvent: (event: ViewerEvent) => void
   /** Everyone else in the room, drawn as figures. Empty when walking the scan alone. */
   peers?: readonly Peer[]
+  /** What has been left in this place, drawn as markers where it was left. */
+  notes?: readonly Note[]
   /** The sound card to place their voices on, once the browser has let sound start. */
   audio?: AudioContext | null
-  /** A press on somebody, with the camera pose to come back to. */
-  onPick?: (id: string, pose: Pose) => void
+  /** A press on somebody or on something left here, with the camera pose to come back to. */
+  onPick?: (picked: Picked, pose: Pose) => void
+  /** A note's clip, playing: it is told where the ears are each frame, so walking changes what is heard. */
+  voice?: NoteVoice | null
   /** Where this page's own person stands, ten times a second, for the others to draw. */
   onStance?: (stance: Stance) => void
 }
@@ -36,12 +42,13 @@ async function loadScene(url: string) {
 
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
-export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance }: Props) {
+export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], notes = [], audio = null, onPick, voice = null,
+  onStance }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, onPick, onStance })
-  useEffect(() => { latest.current = { peers, onPick, onStance } })
+  const latest = useRef({ peers, notes, onPick, voice, onStance })
+  useEffect(() => { latest.current = { peers, notes, onPick, voice, onStance } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -78,14 +85,15 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       fail('The 3D view stopped.')
     }
     renderer.domElement.addEventListener('webglcontextlost', lost)
-    // A press on a person watches them; a press on the room does nothing but take the keyboard, as before.
+    // A press on a person watches them, one on a marker opens its note; a press on the room does nothing but take
+    // the keyboard, as before.
     const pointer = new Vector2()
     const picked = (event: PointerEvent) => {
       const stage = viewer.current?.stage
       const pick = latest.current.onPick
       if (!stage || !pick) return
-      const id = stage.pick(pointerAt(event, renderer.domElement.getBoundingClientRect(), pointer), camera)
-      if (id) pick(id, cameraPose(camera))
+      const found = stage.pick(pointerAt(event, renderer.domElement.getBoundingClientRect(), pointer), camera)
+      if (found) pick(found, cameraPose(camera))
     }
     renderer.domElement.addEventListener('click', picked)
     let splats: SplatMesh | undefined
@@ -106,6 +114,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       if (stopped) return
       const stage = makeStage(world, scene, audio)
       stage.sync(latest.current.peers)
+      stage.show(latest.current.notes)
       viewer.current = { camera, controls, stage }
       let previous: number | null = null
       let told: number | null = null
@@ -113,6 +122,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
         controls.update(previous === null ? 0 : (time - previous) / 1000)
         previous = time
         stage.update(camera, time)
+        latest.current.voice?.hear(camera.position)
         // The others are told where this person stands on the same gate their figures are drawn on.
         if (latest.current.onStance && dueToSend(told, time)) {
           told = time
@@ -151,6 +161,9 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
 
   // Who is in the room changes as people come and go; the figures follow.
   useEffect(() => { viewer.current?.stage?.sync(peers) }, [peers])
+
+  // What is left here changes when somebody leaves or takes back a note; the markers follow.
+  useEffect(() => { viewer.current?.stage?.show(notes) }, [notes])
 
   return <div ref={host} className="absolute inset-0" />
 }

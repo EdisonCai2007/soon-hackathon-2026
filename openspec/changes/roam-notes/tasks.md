@@ -26,11 +26,11 @@
 
 ## 4. The scan shows them
 
-- [ ] 4.1 Add a note's pose to `app/src/apps/roam/placement.ts` and extend `placement.test.ts`.
-- [ ] 4.2 Give `app/src/apps/roam/stage.ts` a marker group beside the figures, and change `pick` to return what kind of thing was hit; extend `stage.test.ts` and every caller.
-- [ ] 4.3 Write `app/src/apps/roam/note-sound.ts` and its test: a fetched clip played through a panner at the note's position, reusing `gainFor`, stopped and disconnected when the panel closes.
-- [ ] 4.4 Write `app/src/apps/roam/Notes.tsx` and `Notes.test.tsx`: the count in the bar, the panel for each kind, *Play from here*, *Remove* shown only to the author or the keeper, and the empty state that says the place holds no notes.
-- [ ] 4.5 Wire the notes through `RoomViewer.tsx` and `Scan.tsx` — the list fetched once, markers drawn, a marker press opening the panel, and the phone link for the keeper — and extend `RoomViewer.test.tsx` and `Scan.test.tsx`.
+- [ ] 4.1 Add a note's pose to `app/src/apps/roam/placement.ts` and extend `placement.test.ts`. Held for the phone's own screen: the scan side needs nothing, because a note is read back at the spot it was already kept at.
+- [x] 4.2 Give `app/src/apps/roam/stage.ts` a marker group beside the figures, and change `pick` to return what kind of thing was hit; extend `stage.test.ts` and every caller. **Found in the build:** a raycast reads the world matrix the last frame left behind, so `pick` now brings its candidates' matrices up to date itself; before that, a press between frames judged a marker to be at the middle of the room.
+- [x] 4.3 Write `app/src/apps/roam/note-sound.ts` and its test: a fetched clip played through a panner at the note's position, reusing `gainFor`, stopped and disconnected when the panel closes.
+- [x] 4.4 Write `app/src/apps/roam/Notes.tsx` and `Notes.test.tsx`: the count in the bar, the panel for each kind, *Play from here*, *Remove* shown only to the author or the keeper, and the empty state that says the place holds no notes. **Changed in the build:** the file is `NotePanel.tsx`, because `Notes.tsx` and `notes.ts` are one name on a case-insensitive filesystem and the build refused both; its screens are tested through the page in `App.test.tsx`, as the room's screens are.
+- [x] 4.5 Wire the notes through `RoomViewer.tsx` and `Scan.tsx` — the list fetched once, markers drawn, a marker press opening the panel, and the phone link for the keeper — and extend `RoomViewer.test.tsx` and `Scan.test.tsx`. The keeper's phone link waits for the phone's own screen in task 3; a press now reaches the viewer even with no room, so a note can be opened while walking alone.
 
 ## 5. The scale, and what people are told
 
