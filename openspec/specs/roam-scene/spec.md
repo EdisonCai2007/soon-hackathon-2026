@@ -114,3 +114,10 @@ The scan SHALL show Edison's animated clips of people, each at its chosen place:
 #### Scenario: The clip fails to load
 - **WHEN** the people model cannot be fetched
 - **THEN** the room still loads and can be walked
+
+### Requirement: Filmed people stay whole up close
+Every part of a filmed person SHALL be drawn whenever it is in view, however far the person's animation has moved them from where their clip starts.
+
+#### Scenario: Walk up to a face
+- **WHEN** the person stands close to a model's face after the model has walked away from its starting spot
+- **THEN** its hair, eyes, eyebrows and mouth are all drawn

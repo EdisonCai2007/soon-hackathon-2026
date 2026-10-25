@@ -91,6 +91,9 @@ export function eyeMaterials(model: Object3D): Material[] {
 async function placeClip(loader: GLTFLoader, placement: Placement, scene: Scene) {
   const gltf = await loader.loadAsync(placement.url)
   for (const material of eyeMaterials(gltf.scene)) showPupils(material)
+  // Three culls a skinned part by its bounds from one pose; the clip walks the small ones (eyes, hair) out of
+  // them, and up close they vanished. A handful of parts per clip costs nothing to always draw.
+  gltf.scene.traverse((part) => { part.frustumCulled = false })
   const { position, yaw, scale } = originFor(placement, scene)
   const group = new Group()
   group.position.fromArray(position)
