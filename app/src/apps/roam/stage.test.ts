@@ -161,48 +161,8 @@ it('picks the person the pointer is on, and nobody where there is nobody', () =>
   viewer.lookAt(new Vector3(0, floorHeight(scene) + figureSize(scene).height / 2, 0))
   viewer.updateMatrixWorld()
   stage.update(viewer, 1000)
-  expect(stage.pick(new Vector2(0, 0), viewer)).toEqual({ kind: 'peer', id: 'a1' })
+  expect(stage.pick(new Vector2(0, 0), viewer)).toBe('a1')
   expect(stage.pick(new Vector2(-0.99, 0.99), viewer)).toBeNull()
-})
-
-const note = (id: string, kind: 'text' | 'voice' | 'photo', at: { x: number; y: number; z: number }) =>
-  ({ id, kind, spot: { ...at, yaw: 0 }, author: 'Dana', words: '', media: kind !== 'text', createdAt: 1 })
-
-it('marks what has been left here, where it was left, and takes a marker away again', () => {
-  const world = new Object3D()
-  const stage = makeStage(world, scene, null)
-  stage.show([note('n1', 'text', { x: 1, y: -3.9, z: 2 }), note('n2', 'voice', { x: 0, y: -1.3, z: 0 })])
-  expect(world.children).toHaveLength(2)
-  // Showing the same place again marks nothing twice.
-  stage.show([note('n1', 'text', { x: 1, y: -3.9, z: 2 }), note('n2', 'voice', { x: 0, y: -1.3, z: 0 })])
-  expect(world.children).toHaveLength(2)
-  // A marker sits at the note's own height, not on the floor: it is where the phone was held.
-  expect(world.children[0].position.toArray()).toEqual([1, -3.9, 2])
-
-  stage.show([note('n2', 'voice', { x: 0, y: -1.3, z: 0 })])
-  expect(world.children).toHaveLength(1)
-  stage.dispose()
-  expect(world.children).toHaveLength(0)
-})
-
-it('turns each marker to face whoever is looking', () => {
-  const world = new Object3D()
-  const stage = makeStage(world, scene, null)
-  stage.show([note('n1', 'photo', { x: 0, y: 0, z: 0 })])
-  stage.update(camera([5, 0, 0]), 1000)
-  expect(world.children[0].rotation.y).toBeCloseTo(Math.PI / 2)
-})
-
-it('says whether a press landed on a person or on something left here', () => {
-  const world = new Object3D()
-  const stage = makeStage(world, scene, null)
-  const spot = { x: 0, y: floorHeight(scene) + 1, z: 0 }
-  stage.show([note('n1', 'text', spot)])
-  const viewer = camera([spot.x, spot.y, 3])
-  viewer.lookAt(new Vector3(spot.x, spot.y, spot.z))
-  viewer.updateMatrixWorld()
-  stage.update(viewer, 1000)
-  expect(stage.pick(new Vector2(0, 0), viewer)).toEqual({ kind: 'note', id: 'n1' })
 })
 
 it('turns a pointer press into where it fell on the view', () => {

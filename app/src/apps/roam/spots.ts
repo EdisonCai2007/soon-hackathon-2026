@@ -5,7 +5,7 @@ import type { Scene } from './scene'
 
 export type Spot = { name: string; camera: number }
 
-/** Named from the scan's own videos until they are taped and named by eye: openspec roam-notes, task 5.2. */
+/** Named from the scan's own videos until they are taped in the real home and named by eye. */
 export const SPOTS: readonly Spot[] = [
   { name: 'Upstairs, where the scan starts', camera: 0 },
   { name: 'The top of the stairs', camera: 307 },

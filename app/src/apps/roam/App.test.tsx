@@ -37,14 +37,10 @@ afterEach(() => {
 // generous: the whole suite loads these pages at once, and a slow machine is not a broken page.
 const heading = (name: string) => () => screen.findByRole('heading', { name }, { timeout: 5000 })
 
-const NOTES = '/apps/roam/api/notes?place=home'
-
 const open = async (at = '/apps/roam/', answers: Record<string, unknown> = {}, arrived = heading('ROAM')) => {
   vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
     if (path === '/api/access/apps') return Response.json({ state: 'current', role: 'employee', revision: 1, apps: ['roam'] })
     if (path in answers) return Response.json(answers[path])
-    // The place is read on every visit; a page with nothing left in it is the usual answer.
-    if (path === NOTES) return Response.json({ notes: [] })
     throw new Error(`Unexpected request: ${path} ${init?.method ?? 'GET'}`)
   }))
   const router = createMemoryRouter(routes, { initialEntries: [at] })
@@ -115,9 +111,10 @@ it('walks the scan alone, with nobody in it and no room in the address', async (
   await open()
   send({ type: 'ready', scene })
   // Nobody to draw or hear, and nobody to tell: where the walker stands is still kept, because walking the scan
-  // with your own body starts from it, and a press still lands, because a note left here can be opened alone.
+  // with your own body starts from it, and a press still lands, though alone it watches nobody.
   expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onStance: expect.any(Function), onPick: expect.any(Function) })
   expect(screen.queryByText('sound off')).toBeNull()
+  expect(screen.queryByText(/left here/)).toBeNull()
   expect(button('Start a room')).toBeTruthy()
 })
 
@@ -135,141 +132,13 @@ it("opens a shared link at the way in, and the camera link at the phone's screen
   await open('/apps/roam/phone/0123456789abcdef0123', { '/apps/roam/scene.json': scene }, heading('Be the camera'))
   cleanup()
 
-  await open('/apps/roam/leave', { '/apps/roam/scene.json': scene }, heading('Leave a note'))
-})
-
-const NOTE = { id: 'a'.repeat(16), kind: 'text', spot: { x: 1, y: -3.9, z: 2, yaw: 0 }, author: 'Dana',
-  words: 'The boiler resets behind this panel.', media: false, createdAt: Date.UTC(2026, 9, 20) }
-const CLIP = { ...NOTE, id: 'b'.repeat(16), kind: 'voice', words: '', media: true }
-const left = (...notes: unknown[]) => ({ [NOTES]: { notes } })
-const press = (note: { id: string }) => act(() => viewer.props!.onPick!({ kind: 'note', id: note.id }, poseFor(scene, 0)))
-
-it('says the place holds nothing until somebody leaves something', async () => {
-  await open()
-  expect(screen.getByText('nothing left here yet')).toBeTruthy()
-  cleanup()
-  await open('/apps/roam/', left(NOTE, CLIP))
-  expect(screen.getByText('2 notes left here')).toBeTruthy()
-})
-
-it('opens a note left here on a press, and closes it again', async () => {
-  await open('/apps/roam/', left(NOTE))
-  send({ type: 'ready', scene })
-  expect(screen.getByText('1 note left here')).toBeTruthy()
-  expect(viewer.props!.notes).toEqual([NOTE])
-
-  await press(NOTE)
-  expect(screen.getByText(NOTE.words)).toBeTruthy()
-  expect(screen.getByText(/Dana/)).toBeTruthy()
-  // Nothing to remove: this browser neither left it nor keeps the place.
-  expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-
-  fireEvent.click(button('Close'))
-  expect(screen.queryByText(NOTE.words)).toBeNull()
-})
-
-it('shows a photo left here, and offers the keeper the way to take it back', async () => {
-  localStorage.setItem('roam-keeper-home', 'k'.repeat(48))
-  const photo = { ...NOTE, id: 'c'.repeat(16), kind: 'photo', words: '', media: true }
-  await open('/apps/roam/', left(photo))
-  send({ type: 'ready', scene })
-  await press(photo)
-  const shown = screen.getByAltText('Left here by Dana') as HTMLImageElement
-  expect(shown.src).toContain(`/apps/roam/api/note-media?place=home&id=${photo.id}`)
-  expect(button('Remove')).toBeTruthy()
-  localStorage.clear()
-})
-
-it("plays a note's voice from where it was left, and stops it", async () => {
-  const node = () => ({ connect: (next: unknown) => next, disconnect: vi.fn() })
-  const source = { ...node(), buffer: null as unknown, start: vi.fn(), stop: vi.fn(), onended: null as unknown }
-  vi.stubGlobal('AudioContext', class {
-    currentTime = 0
-    destination = {}
-    createBufferSource = () => source
-    createGain = () => ({ ...node(), gain: { setTargetAtTime: vi.fn() } })
-    createPanner = () => ({ ...node(), panningModel: '', distanceModel: '', rolloffFactor: 1 })
-    decodeAudioData = async () => ({ duration: 1 })
-  })
-  await open('/apps/roam/', { ...left(CLIP), '/apps/roam/api/note-media?place=home&id=bbbbbbbbbbbbbbbb': {} })
-  send({ type: 'ready', scene })
-  await press(CLIP)
-
-  await act(async () => { fireEvent.click(button('Play from here')) })
-  expect(source.start).toHaveBeenCalled()
-  expect(viewer.props!.voice).not.toBeNull()
-
-  fireEvent.click(button('Stop'))
-  expect(source.stop).toHaveBeenCalled()
-  expect(viewer.props!.voice).toBeNull()
-  expect(button('Play from here')).toBeTruthy()
-})
-
-it('shows the note but plays nothing where the browser has no sound card, or no room loaded yet', async () => {
-  await open('/apps/roam/', left(CLIP))
-  await press(CLIP)
-  await act(async () => { fireEvent.click(button('Play from here')) })
-  expect(viewer.props!.voice).toBeNull()
-  expect(button('Play from here')).toBeTruthy()
-})
-
-it('leaves the Play button alone when the clip itself cannot be fetched', async () => {
-  vi.stubGlobal('AudioContext', class {
-    currentTime = 0
-    destination = {}
-    createBufferSource = () => ({ connect: (next: unknown) => next, start: vi.fn(), stop: vi.fn() })
-    createGain = () => ({ connect: (next: unknown) => next, gain: { setTargetAtTime: vi.fn() } })
-    createPanner = () => ({ connect: (next: unknown) => next })
-    decodeAudioData = async () => ({ duration: 1 })
-  })
-  await open('/apps/roam/', left(CLIP))
-  send({ type: 'ready', scene })
-  await press(CLIP)
-  await act(async () => { fireEvent.click(button('Play from here')) })
-  expect(viewer.props!.voice).toBeNull()
-})
-
-it('keeps a note that was refused a removal, and still closes the panel', async () => {
-  localStorage.setItem(`roam-note-${NOTE.id}`, 'stale')
-  await open('/apps/roam/', left(NOTE))
-  const first = vi.mocked(fetch).getMockImplementation()!
-  vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) =>
-    path === '/apps/roam/api/note' && init?.method === 'DELETE' ? new Response('no', { status: 403 }) : first(path, init)))
-  send({ type: 'ready', scene })
-  await press(NOTE)
-  await act(async () => { fireEvent.click(button('Remove')) })
-  expect(screen.getByText('1 note left here')).toBeTruthy()
-  expect(screen.queryByText(NOTE.words)).toBeNull()
-  localStorage.clear()
+  await open('/apps/roam/leave', { '/apps/roam/scene.json': scene }, heading('Walk the home'))
 })
 
 it('does nothing when a press lands on a person while walking the place alone', async () => {
   await open()
   send({ type: 'ready', scene })
-  await act(() => viewer.props!.onPick!({ kind: 'peer', id: 'a1' }, poseFor(scene, 0)))
+  await act(() => viewer.props!.onPick!('a1', poseFor(scene, 0)))
   expect(screen.queryByText(/up close/)).toBeNull()
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
-})
-
-it('lets whoever left a note take it back, and forgets it afterwards', async () => {
-  localStorage.setItem(`roam-note-${NOTE.id}`, 'f'.repeat(48))
-  const removals: RequestInit[] = []
-  await open('/apps/roam/', left(NOTE))
-  const first = vi.mocked(fetch).getMockImplementation()!
-  vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
-    if (path === '/apps/roam/api/note' && init?.method === 'DELETE') {
-      removals.push(init)
-      return Response.json({ removed: NOTE.id })
-    }
-    if (path === NOTES && removals.length > 0) return Response.json({ notes: [] })
-    return first(path, init)
-  }))
-  send({ type: 'ready', scene })
-  await press(NOTE)
-
-  await act(async () => { fireEvent.click(button('Remove')) })
-  expect(JSON.parse(String(removals[0].body))).toEqual({ place: 'home', id: NOTE.id, secret: 'f'.repeat(48) })
-  expect(screen.getByText('nothing left here yet')).toBeTruthy()
-  expect(screen.queryByText(NOTE.words)).toBeNull()
-  expect(localStorage.getItem(`roam-note-${NOTE.id}`)).toBeNull()
 })

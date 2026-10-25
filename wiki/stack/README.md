@@ -25,7 +25,6 @@ The pack uses **merge = deploy**, independent staging and branch previews. [One 
 - [Mini apps](mini-apps.md) — small apps from one request, part of the main app under `/apps/`: the same loop and checks as any change, and a card each on the home page.
 - [Live rooms in a mini app](live-rooms.md) — several people in one space at once: a Durable Object per room over hibernatable sockets, browser-to-browser media, and a class the test suite can open.
 - [Hands read in the browser](hand-signs.md) — a person's own camera turned into held hand signs: landmarks in a seam, each sign as plain geometry, a hold and a wait before anything fires, and where the model and its WebAssembly are served from.
-- [A lasting place in a mini app](places-and-notes.md) — what people leave behind and find again later: rows rather than a room, bytes beside the row without object storage, the caps an open address needs, and telling authors apart with no sign-in.
 - [Cloudflare Access](cloudflare-access.md) — automatic email login, native Worker and preview coverage, signed identity, and separate machine access.
 - [Employee access](employee-access.md) — the Access mini app: how the owner is known, the live app's key for its sign-in list, the first open, apps by a tick, and key levels.
 - [Access on previews](preview-access.md) — who signs in to previews, GitHub pushers included, the practice list, and the checker.

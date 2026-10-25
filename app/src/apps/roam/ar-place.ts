@@ -16,7 +16,7 @@ export const placingFor = (anchor: Anchor, scene: Scene): Placing => ({
 })
 
 /** Where a place in the scan falls in the session's own metres: exactly the inverse of `toScanPose`, so the
- *  drawn view and a note left in it cannot disagree about where the person was standing. */
+ *  drawn view and the pose the phone reports cannot disagree about where the person is standing. */
 export function sessionSpot(spot: Spot, { inner, yaw, scale }: Placing): Spot {
   const x = (spot.x + inner[0]) * scale
   const y = (spot.y + inner[1]) * scale

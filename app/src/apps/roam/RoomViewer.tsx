@@ -7,13 +7,11 @@ import { PovControls } from './pov-controls'
 import { applyPose, cameraPose, loadScene, type Pose } from './scene'
 import { loadSplats } from './splat-scene'
 import { dueToSend } from './pose-feed'
-import { makeStage, pointerAt, stanceOf, type Picked, type Stage } from './stage'
+import { makeStage, pointerAt, stanceOf, type Stage } from './stage'
 import { ThumbPad } from './ThumbPad'
 import { STILL, type Push } from './thumb-pad'
 import type { Peer } from './presence'
 import type { Pose as Stance } from './messages'
-import type { Note } from './notes'
-import type { NoteVoice } from './note-sound'
 import type { ViewerEvent } from './viewer-state'
 
 type Viewer = { camera: PerspectiveCamera; controls: PovControls; stage: Stage | null; spells: CastStage | null }
@@ -24,14 +22,10 @@ type Props = {
   onEvent: (event: ViewerEvent) => void
   /** Everyone else in the room, drawn as figures. Empty when walking the scan alone. */
   peers?: readonly Peer[]
-  /** What has been left in this place, drawn as markers where it was left. */
-  notes?: readonly Note[]
   /** The sound card to place their voices on, once the browser has let sound start. */
   audio?: AudioContext | null
-  /** A press on somebody or on something left here, with the camera pose to come back to. */
-  onPick?: (picked: Picked, pose: Pose) => void
-  /** A note's clip, playing: it is told where the ears are each frame, so walking changes what is heard. */
-  voice?: NoteVoice | null
+  /** A press on somebody, by their peer id, with the camera pose to come back to. */
+  onPick?: (id: string, pose: Pose) => void
   /** Where this page's own person stands, ten times a second, for the others to draw. */
   onStance?: (stance: Stance) => void
   /** The techniques running right now, drawn where whoever cast them stands. */
@@ -43,8 +37,8 @@ const hasWebGL = () => document.createElement('canvas').getContext('webgl2') !==
 
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
-export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], notes = [], audio = null, onPick, voice = null,
-  onStance, casts = [] }: Props) {
+export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance,
+  casts = [] }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const wash = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
@@ -52,8 +46,8 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
   const [touched, setTouched] = useState(false)
   const push = useRef<Push>(STILL)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, notes, onPick, voice, onStance, casts })
-  useEffect(() => { latest.current = { peers, notes, onPick, voice, onStance, casts } })
+  const latest = useRef({ peers, onPick, onStance, casts })
+  useEffect(() => { latest.current = { peers, onPick, onStance, casts } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -100,8 +94,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       fail('The 3D view stopped.')
     }
     renderer.domElement.addEventListener('webglcontextlost', lost)
-    // A press on a person watches them, one on a marker opens its note; a press on the room does nothing but take
-    // the keyboard, as before.
+    // A press on a person watches them; a press on the room does nothing but take the keyboard, as before.
     const pointer = new Vector2()
     const picked = (event: PointerEvent) => {
       const stage = viewer.current?.stage
@@ -130,7 +123,6 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       const stage = makeStage(world, scene, audio)
       const spells = makeCastStage(world, scene)
       stage.sync(latest.current.peers)
-      stage.show(latest.current.notes)
       let previous: number | null = null
       let told: number | null = null
       const watch = watchDetail(detailed)
@@ -142,7 +134,6 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
         stage.update(camera, time)
         // A technique is drawn over the room's people, and its brightest moment washes the whole view.
         washing.style.opacity = String(spells.draw(latest.current.casts, time))
-        latest.current.voice?.hear(camera.position)
         // The others are told where this person stands on the same gate their figures are drawn on.
         if (latest.current.onStance && dueToSend(told, time)) {
           told = time
@@ -183,9 +174,6 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
 
   // Who is in the room changes as people come and go; the figures follow.
   useEffect(() => { viewer.current?.stage?.sync(peers) }, [peers])
-
-  // What is left here changes when somebody leaves or takes back a note; the markers follow.
-  useEffect(() => { viewer.current?.stage?.show(notes) }, [notes])
 
   const touch = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch') setTouched(true)

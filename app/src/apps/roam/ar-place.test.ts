@@ -42,7 +42,7 @@ it('makes one real metre one metre of scan, whichever way it is measured', () =>
   near(Math.hypot(side.x, side.z), 1)
 })
 
-it('is the inverse of the placing a note uses, from a taped spot and from a view alike', () => {
+it('is the inverse of the placing a phone’s pose uses, from a taped spot and from a view alike', () => {
   const walked = { x: 0.8, y: 1.5, z: -2.3, yaw: 0.6 }
   const anchors = [anchor, { x: 1.4, z: -0.7, yaw: 1.1, floor: anchor.floor }]
   for (const one of anchors) {

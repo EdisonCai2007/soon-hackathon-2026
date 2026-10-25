@@ -94,31 +94,3 @@ VALUES
   ('11111111-1111-4111-8111-111111111111', 'fay@example.invalid', 'a0000000000000000000000000000004', 'agent',
    'Get Ronald''s files', 'ronald-files', '{"state":"done","proof":"Files in the shared drive: https://drive.example.invalid/ronald"}',
    '[]', 'seed-1', 1792828800000, 4102444800000, NULL);
-
--- ROAM's lasting place (app/worker/apps/roam/): what someone handing over the
--- scanned home left in it, so a preview and a walk start from real notes. The
--- positions are the scan's own camera spots, on both floors. Nothing here was
--- said by anybody real.
---
--- Every seeded note carries the SHA-256 of 'seeded-secret', and the seeded
--- place the SHA-256 of 'seeded-keeper', so a staging walk can try taking a note
--- back without leaving one first. Only staging ever holds these rows.
-INSERT INTO roam_places (place, keeper_hash, created_at) VALUES
-  ('home', 'ca87a5750ba59295fedaba72960a691dd2e141a603adeb409569cdcb04fec9d5', 1792828800000);
-
-INSERT INTO roam_notes (place, id, kind, x, y, z, yaw, author, words, media, media_type, secret_hash, created_at) VALUES
-  ('home', 'a1b2c3d4e5f60718', 'text', -10.13, -2.98, 7.17, 1.9, 'Dana',
-   'The boiler resets behind this panel. Hold the button until the light stops blinking.',
-   NULL, NULL, '3e21b8fc16040e31865f18121e109ff1ca6509fceb17b7d5e1842f73d3e50d0a', 1792828800000),
-  ('home', 'b2c3d4e5f6071829', 'text', 0.69, -2.34, -2.76, -0.4, 'Dana',
-   'Mind the step on the way in — it is lower than it looks.',
-   NULL, NULL, '3e21b8fc16040e31865f18121e109ff1ca6509fceb17b7d5e1842f73d3e50d0a', 1792832400000),
-  ('home', 'c3d4e5f607182939', 'text', -3.89, 0.10, 1.79, 2.4, 'Rafi',
-   'This window latch needs lifting before it turns. The spare key is in the kitchen drawer.',
-   NULL, NULL, '3e21b8fc16040e31865f18121e109ff1ca6509fceb17b7d5e1842f73d3e50d0a', 1792836000000),
-  ('home', 'd4e5f60718293a4b', 'photo', 0.01, 0.35, 0.85, 0.2, 'Rafi', '',
-   X'89504e470d0a1a0a0000000d49484452000000080000000808020000004b6d29dc000000814944415478da05c1a11500200840410763048303f89c80097ca69f08649291487242ef9a0cfa600e7470063eb8831a3459f4c55ce8e22c7c7117b568a274652aaa1cc595ab94d264d33773a39bb3f1cdddd4a689d18d69a8710c37ae514693a00733d0e0041edca08226494f66a2c9493cb949254d1efd311ffa380f7fdc473d3e93e65dc1a377a1110000000049454e44ae426082', 'image/png',
-   '3e21b8fc16040e31865f18121e109ff1ca6509fceb17b7d5e1842f73d3e50d0a', 1792839600000),
-  ('home', 'e5f60718293a4b5c', 'voice', -1.86, 0.18, 1.10, -1.1, 'Dana', '',
-   X'52494646b401000057415645666d74201000000001000100401f0000401f0000010008006461746190010000808e99a2a7a8a39a8f8174675e59585c65707d8b98a1a7a8a49c9184766a605a585b636e7b8995a0a6a8a59e9386796c615a585a616c7986939ea5a8a6a095897b6e635b585a606a7684919ca4a8a7a1988b7d70655c58595e6774818f9aa3a8a7a2998e8072675e59585d66717f8c99a2a7a8a49b908375685f59585c646f7c8a96a0a6a8a59d9285776b605a585b626d7a87949fa6a8a69f94877a6d625b585a606b7785929da5a8a6a0968a7c6f645c58595f687583909ba4a8a7a2998c7f71665d58595e6772808e99a2a7a8a39a8f8174675e59585c65707d8b98a1a7a8a49c9184766a605a585b636e7b8995a0a6a8a59e9386796c615a585a616c7986939ea5a8a6a095897b6e635b585a606a7684919ca4a8a7a1988b7d70655c58595e6774818f9aa3a8a7a2998e8072675e59585d66717f8c99a2a7a8a49b908375685f59585c646f7c8a96a0a6a8a59d9285776b605a585b626d7a87949fa6a8a69f94877a6d625b585a606b7785929da5a8a6a0968a7c6f645c58595f687583909ba4a8a7a2998c7f71665d58595e6772', 'audio/wav',
-   '3e21b8fc16040e31865f18121e109ff1ca6509fceb17b7d5e1842f73d3e50d0a', 1792843200000);

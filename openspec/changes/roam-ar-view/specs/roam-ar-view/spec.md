@@ -1,15 +1,11 @@
 ## ADDED Requirements
 
-### Requirement: The scan is drawn over the real room
-Once a phone has lined up on a marked spot, ROAM SHALL draw the scanned home over the real one through the phone's AR session, placed so the marked spot's position, facing and scale in the scan meet the place the person is standing.
+### Requirement: The scan is drawn over the real room from the walk screen
+Once a phone has lined up on a marked spot on the walk screen, ROAM SHALL draw the scanned home over the real one through the phone's AR session, placed so the marked spot's position, facing and scale in the scan meet the place the person is standing.
 
 #### Scenario: The home appears over itself
 - **WHEN** a person standing on a marked spot in the real home picks it on the phone
 - **THEN** the scanned home is drawn over the real one, with the scan's own copy of where they stand sitting where they stand
-
-#### Scenario: Placed the same way a note is
-- **WHEN** the view is placed against a marked spot and a note is left from the same session
-- **THEN** both use the same spot and the same scale, so the note's marker is drawn where the person was standing
 
 ### Requirement: The view moves with the phone
 While the session runs, ROAM SHALL take the drawn view from the phone's own tracked pose each frame, so walking and turning in the real home move through the scan, and SHALL NOT move the view from the page.
@@ -31,10 +27,10 @@ ROAM SHALL offer one control that turns the drawn scan on and off, SHALL start w
 
 #### Scenario: Turning it off
 - **WHEN** the person presses the control again
-- **THEN** the scan is not drawn, the view is the camera's picture with the page's controls over it, and tracking and leaving notes go on unaffected
+- **THEN** the scan is not drawn, the view is the camera's picture with the page's controls over it, and tracking and walking go on unaffected
 
 ### Requirement: A phone that cannot carry the drawing keeps working
-ROAM SHALL draw no more of the scan than a phone can carry, by drawing it at a level of detail within a set number of splats rather than every splat the scan holds. Where the browser has no AR, the drawing cannot be built, the 3D view is lost, or the phone still cannot hold a usable frame rate, ROAM SHALL say so plainly and SHALL leave lining up, walking and leaving notes working as they do without the drawing.
+ROAM SHALL draw no more of the scan than a phone can carry, by drawing it at a level of detail within a set number of splats rather than every splat the scan holds. Where the browser has no AR, the drawing cannot be built, the 3D view is lost, or the phone still cannot hold a usable frame rate, ROAM SHALL say so plainly and SHALL leave lining up and walking working as they do without the drawing.
 
 #### Scenario: A scan bigger than the phone
 - **WHEN** the scan holds far more splats than the phone can draw at once
@@ -42,11 +38,11 @@ ROAM SHALL draw no more of the scan than a phone can carry, by drawing it at a l
 
 #### Scenario: Too slow to draw
 - **WHEN** the frame rate stays below what the view needs while the scan is on
-- **THEN** the scan is turned off, the control goes away, the page says the phone could not carry it, and the session keeps tracking and taking notes
+- **THEN** the scan is turned off, the control goes away, the page says the phone could not carry it, and the session keeps tracking
 
 #### Scenario: The 3D view is lost
 - **WHEN** the phone loses the 3D view while the scan is on
-- **THEN** the scan is turned off and said to have been, and the session, its tracking and its notes carry on
+- **THEN** the scan is turned off and said to have been, and the session and its tracking carry on
 
 #### Scenario: No AR in this browser
 - **WHEN** the browser offers no AR session, as on an iPhone

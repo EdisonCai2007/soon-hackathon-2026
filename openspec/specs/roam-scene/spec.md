@@ -45,7 +45,7 @@ The viewer SHALL move with W/A/S/D on the horizontal plane and Q/E vertically, w
 - **THEN** they move through the scan in that direction for as long as they hold it, and dragging elsewhere still turns the view
 
 #### Scenario: The movement control is not a press on the room
-- **WHEN** a press begins on the movement control and finishes over a person or a marker in the view
+- **WHEN** a press begins on the movement control and finishes over a person in the view
 - **THEN** nothing is opened or watched: the press moved them and did nothing else
 
 #### Scenario: Leaning towards the view

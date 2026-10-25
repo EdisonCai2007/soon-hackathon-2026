@@ -38,8 +38,8 @@ ROAM SHALL draw a fired technique in the scan at the position the room reports f
 - **THEN** it stops being drawn and heard, and the scan, the figures and anything left in the room are unchanged by it
 
 ### Requirement: A technique changes nothing in the room
-A technique SHALL be appearance alone: it SHALL NOT move, remove, hide or alter any person, figure, note or part of the scan, and SHALL NOT prevent anybody from moving, pressing or hearing anything while it runs.
+A technique SHALL be appearance alone: it SHALL NOT move, remove, hide or alter any person, figure or part of the scan, and SHALL NOT prevent anybody from moving, pressing or hearing anything while it runs.
 
 #### Scenario: Cast while someone is being watched
-- **WHEN** a technique runs while a person is walking the scan, watching somebody, or reading something left in the room
+- **WHEN** a technique runs while a person is walking the scan or watching somebody
 - **THEN** all of that keeps working, and nothing in the room is different once the technique has finished

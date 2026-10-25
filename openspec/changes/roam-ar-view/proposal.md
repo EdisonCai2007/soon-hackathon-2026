@@ -1,12 +1,12 @@
 # The scanned home, drawn over the real one — and your own body moving you through it
 
 **Status:** part built — the thumb pad works and the scan loads from one place. The frame rate is now measured and the answer is yes, at a 60,000-splat budget. The laptop's leaning still waits on its own measurement.
-**Branch:** roam-ar-view (branched from `roam-notes`, so the notes work sits underneath it)
+**Branch:** roam-ar-view (branched from `roam-notes`; notes have since been taken out by `roam-drop-notes`, which this branch merges in)
 **Open questions:** what reading a face off the laptop's camera costs while the scan is drawing, which decides whether leaning works on an ordinary laptop or only a fast one. And, from the owner's own eyes rather than a number, whether the scan sits on the real walls at the setting that is fast enough.
 
 ## Why
 
-Standing in the real home, the phone shows the real camera view with our buttons over it. It never draws the scan at all, so moving the phone moves nothing and there is no way to tell whether a note landed on the thing it describes — or whether the scan's scale is right at all. Drawing the scan over the real room as you walk makes both of those visible in a second, and it is the moment that stops being a video call: the home you are standing in and the copy of it line up, and stay lined up as you move.
+Standing in the real home, the phone shows the real camera view with our buttons over it. It never draws the scan at all, so moving the phone moves nothing and there is no way to tell whether the scan's scale is right at all. Drawing the scan over the real room as you walk makes that visible in a second, and it is the moment that stops being a video call: the home you are standing in and the copy of it line up, and stay lined up as you move.
 
 The same thing is missing on the other side of the room. Someone who joins the room from anywhere else moves by holding W/A/S/D and dragging with a mouse, so on a phone they cannot move at all — there are no keys to hold — and on a laptop moving your own body does nothing. Once a phone can draw the scan and follow its own movement, the person who joined from a sofa can walk the home by walking their own floor, every phone gets something to walk with, and a laptop can at least lean.
 
@@ -33,18 +33,16 @@ The same thing is missing on the other side of the room. Someone who joins the r
   <div class="card col gap phone">
     <div class="row gap"><span class="tag">lined up · the lobby</span><span class="grow"></span><span class="tag-outline">scan on</span></div>
     <div class="bar">the scanned home, drawn over the real one</div>
-    <div class="row gap"><button class="btn-primary">Leave a note here</button><button class="btn-ghost">Scan off</button></div>
-    <div class="row gap"><button class="btn-ghost">Line up again</button><button class="btn-ghost">Stop</button></div>
+    <div class="row gap"><button class="btn-primary">Line up again</button><button class="btn-ghost">Scan off</button></div>
+    <div class="row gap"><button class="btn-ghost">Stop</button></div>
   </div>
   ```
 
-- **It is the same screen you already leave notes from.** No second page and no second line-up: the note screen gains the drawing. So you walk up to the boiler, see the scanned boiler sitting on the real one, press *Leave a note here*, and watch the marker land exactly where you stood.
-
-- **Notes already left show up as you walk past them.** The markers are drawn in the scan, so standing in the real home you see what other people left, on the thing they left it on.
+- **It is the same screen you already walk the home from.** No second page and no second line-up: the walk screen gains the drawing. So you walk up to the boiler and see the scanned boiler sitting on the real one.
 
 - **The phone draws as much of the home as it can carry, not all of it.** Measured on the owner's own phone, drawing every one of the scan's 546,977 splats runs at two frames a second and kills the view, so the phone is given a budget and draws what is nearest and largest within it. The laptop keeps the full detail it already holds ninety frames a second at.
 
-- **If the phone still cannot draw it, it says so and keeps working.** A phone without the browser's AR support, one that loses the 3D view, or one that cannot hold a usable frame rate falls back to the note screen as it is today rather than a stuttering picture.
+- **If the phone still cannot draw it, it says so and keeps working.** A phone without the browser's AR support, one that loses the 3D view, or one that cannot hold a usable frame rate falls back to the walk screen as it is today rather than a stuttering picture.
 
 - **Joined from anywhere on an Android phone, you walk the home by walking your own floor.** Press *Walk it* in the room and you are inside the scan: turn your body to look, take a step and you take a step in the home, at life size. When you run out of real floor, one press lets you carry on walking from where you got to. Everyone else in the room sees your figure walk as you do, with nothing new to set up.
   ```mermaid
@@ -82,7 +80,7 @@ The same thing is missing on the other side of the room. Someone who joins the r
   </svg>
   ```
 
-Non-goals: drawing people's live figures over the real room, hiding the scan behind real walls where it should be out of sight, lining up by looking at a marker instead of standing on a taped spot, an iPhone walking by its own movement (its browser cannot tell where it is — it gets the thumb pad), leaning as a way to travel rather than to peer, making a step cover more ground than a step, scanning the home again to show what changed, and changing how notes are stored or read on a laptop.
+Non-goals: drawing people's live figures over the real room, hiding the scan behind real walls where it should be out of sight, lining up by looking at a marker instead of standing on a taped spot, an iPhone walking by its own movement (its browser cannot tell where it is — it gets the thumb pad), leaning as a way to travel rather than to peer, making a step cover more ground than a step, and scanning the home again to show what changed.
 
 ## Capabilities
 
@@ -99,12 +97,12 @@ Non-goals: drawing people's live figures over the real room, hiding the scan beh
 
 - The ROAM mini app gains an AR rendering module that hands the session to Three.js (`renderer.xr`) and places the splat scan against the lined-up spot, plus a plain module for that placing transform. `Leave.tsx` grows the canvas, the scan's on-and-off button and the frame-rate fallback; `ar-session.ts` changes so a caller can take the session over rather than only being told poses.
 - `RoomViewer.tsx` and the new AR view both load a scan and draw splats; the shared part moves to one module so the two do not drift apart.
-- The two phone screens, `Phone.tsx` and `Leave.tsx`, stop keeping their own copies of the same AR session lifecycle and share one `use-phone-ar.ts`. Nothing about either screen changes for the person; it happens first so the note screen is reshaped once rather than twice.
+- The two phone screens, `Phone.tsx` and `Leave.tsx`, stop keeping their own copies of the same AR session lifecycle and share one `use-phone-ar.ts`. Nothing about either screen changes for the person; it happens first so the walk screen is reshaped once rather than twice.
 - The room view's own movement grows in `pov-controls.ts`, which gains a second source of the same movement vector the keys already produce, fed by a thumb pad drawn over the view and by a head offset read from the camera. `Scan.tsx` gains the pad, *Walk it* and *Lean to look*; `RoomViewer.tsx` hands the controls the offset each frame.
 - Reading a head reuses the hand reader's shape exactly — one module that owns MediaPipe and nothing else — and adds its face model to the files the app serves itself, by the same vendoring script. That file must stay under Cloudflare's 25 MiB asset limit, which it does.
 - `detail.ts` holds the settings the view may draw at and the watch that steps down through them; `RoomViewer.tsx` applies one. The phone's AR view takes its budget from the same table, so the laptop and the phone cannot disagree about what a setting means.
 - **No new packages.** Three.js already carries WebXR, the installed Spark already draws through `renderer.xr.getCamera()`, and MediaPipe's vision tasks are already a dependency for hands.
-- No server side, no migration, no schema change. A guest's place in the room still goes up as the same position ten times a second, whatever moved them, so nobody else's page changes at all. Notes, rooms and walking the scan with the keyboard behave exactly as they do today.
+- No server side, no migration, no schema change. A guest's place in the room still goes up as the same position ten times a second, whatever moved them, so nobody else's page changes at all. Rooms and walking the scan with the keyboard behave exactly as they do today.
 - Possible follow-on, decided by the frame-rate check: a trimmed copy of the scan served to phones, which would add one build step and one more public file.
 - Worth knowing before the build: the `roam-body` branch (pull request 10) is open against `RoomViewer.tsx` and `Scan.tsx`, the two files the room's movement touches. Different intent, same files.
 
@@ -152,3 +150,4 @@ Non-goals: drawing people's live figures over the real room, hiding the scan beh
 - **2026-10-25** — **Measured on the owner's phone, and it settles the open question: the scan ships as it is.** With Spark's LOD asked for and the renderer's `enableLod` set, a **60,000-splat budget at 0.6 pixel ratio and `lodRenderScale` 4 holds 65–80 fps** — the same range the phone reaches drawing nothing. 120k at ¾ pixels holds 25–64, and 250k 60–62. So the budget is the lever, the aggressive setting is the one to ship, and **no trimmed copy of the file is needed**: the LOD tree is computed in a worker from the same `room.spz` in 4–5 seconds, so nothing changes about what is served.
 - **2026-10-25** — Found on the same run, and worth a guard rather than a shrug: the 3D view was **still lost at the 250k setting**, after three LOD trees had been built in one session. Production builds one setting once and never switches, so this is probably the probe's own churn — but the `webglcontextlost` path stays in the plan and the renderer keeps only one mesh at a time, because a phone that lost the context three runs out of three is not a phone to take chances with.
 - **2026-10-25** — Confirmed on the same run, third time over: `getViewerPose` answered nothing on **92%** of frames while three.js held the session, yet three.js's own camera moved on 67 of them. Reading `renderer.xr.getCamera()` is now evidence, not a hunch, and asking the frame a second time is the thing not to build.
+- **2026-10-25** — Reworded after `roam-drop-notes` took notes out of ROAM: the note screen is now the walk screen, so the drawing lands there and nothing here says a note lands. Nothing this change builds is different.

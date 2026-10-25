@@ -176,6 +176,10 @@ The timestamp prefix does real work: **filename order equals author order equals
 
 Forward-only, too: no `down` scripts. A migration that shouldn't have shipped is fixed by a *new* migration (or, for production, [Time Travel](d1-recovery.md#a-bad-migration-reached-production)) — never by editing or deleting the file that already ran, which fresh databases still need to replay.
 
+## A BLOB comes back as an array
+
+D1 returns a `BLOB` column as an array of byte values, not an `ArrayBuffer`. `new Response(row.media)` on that array answers 200, with the right content type and an empty body. Convert it with `new Uint8Array(row.media)` before answering. A local SQLite stand-in returns the bytes themselves, so only a deployed check catches it: test both shapes.
+
 ## Seeded staging, production untouched
 
 Staging is a **seeded fixture database, not a mirror of production.** `npm run db:reset:staging` runs [`scripts/reset-staging-d1.mjs`](#the-scripts), which:

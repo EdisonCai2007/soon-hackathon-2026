@@ -49,8 +49,11 @@ const live = (over: Partial<Live> = {}): Live => ({
   peers: [], audio: null, soundBlocked: false, unlock: () => {}, tell: () => {}, people: null, casting: casting(), ...over,
 })
 
+// The scan asks the server for nothing: anything it fetched would be a request this page no longer makes.
+const fetched = vi.fn(() => Promise.reject(new Error('Unexpected request')))
+
 const open = async (over: Partial<Live> = {}) => {
-  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ notes: [] })))))
+  vi.stubGlobal('fetch', fetched)
   await act(async () => { render(<Scan app="roam" live={live(over)} />) })
 }
 
@@ -76,10 +79,11 @@ it('says the model is loading while the reader starts', async () => {
   expect(screen.getByRole('button', { name: 'Hands off' })).toBeTruthy()
 })
 
-it('offers nothing about hands when the scan is walked alone', async () => {
-  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ notes: [] })))))
+it('offers nothing about hands when the scan is walked alone, and asks the server for nothing', async () => {
+  vi.stubGlobal('fetch', fetched)
   await act(async () => { render(<Scan app="roam" />) })
   expect(screen.queryByRole('button', { name: 'Hands on' })).toBeNull()
+  expect(fetched).not.toHaveBeenCalled()
 })
 
 const scene = parseScene(JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../public/apps/roam/scene.json'), 'utf8')))

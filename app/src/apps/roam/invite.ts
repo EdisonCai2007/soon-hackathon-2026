@@ -1,5 +1,5 @@
-// The room lives in the address: /apps/roam/ walks the scan and reads what is left in it, r/<id> joins a room,
-// phone/<id> is the camera in the real room, and leave is the phone leaving notes, which needs no room.
+// The room lives in the address: /apps/roam/ walks the scan, r/<id> joins a room,
+// phone/<id> is the camera in the real room, and leave is the phone walking the home, which needs no room.
 export type Arrival =
   | { kind: 'alone' }
   | { kind: 'guest'; roomId: string }
@@ -26,5 +26,5 @@ const linkTo = (origin: string, app: string, prefix: string, roomId: string) => 
 export const inviteLink = (origin: string, app: string, roomId: string): string => linkTo(origin, app, 'r', roomId)
 export const cameraLink = (origin: string, app: string, roomId: string): string => linkTo(origin, app, 'phone', roomId)
 
-/** The link a phone opens to leave notes in the place, which belongs to no room. */
+/** The link a phone opens to walk the real home, which belongs to no room. */
 export const leaveLink = (origin: string, app: string): string => `${origin}/apps/${app}/leave`

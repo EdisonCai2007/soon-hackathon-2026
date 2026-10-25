@@ -114,7 +114,7 @@ it('watches a person up close and comes back to the same spot', async () => {
   await open({ peers: [peer('a1', 'Alex', stream)] })
   await ready()
   const saved = poseFor(scene, 7)
-  act(() => viewer.props!.onPick!({ kind: 'peer', id: 'a1' }, saved))
+  act(() => viewer.props!.onPick!('a1', saved))
   expect(screen.getByLabelText('Alex up close')).toBeTruthy()
 
   fireEvent.click(screen.getByRole('button', { name: 'Close' }))
@@ -125,7 +125,7 @@ it('watches a person up close and comes back to the same spot', async () => {
 it('says so when the person being watched has no camera on', async () => {
   await open({ peers: [peer('a1', 'Alex')] })
   await ready()
-  act(() => viewer.props!.onPick!({ kind: 'peer', id: 'a1' }, poseFor(scene, 0)))
+  act(() => viewer.props!.onPick!('a1', poseFor(scene, 0)))
   expect(screen.getByText('Alex has no camera on.')).toBeTruthy()
 })
 
@@ -133,7 +133,7 @@ it('closes the view of somebody who leaves while being watched', async () => {
   const stream = {} as MediaStream
   const change = await open({ peers: [peer('a1', 'Alex', stream)] })
   await ready()
-  act(() => viewer.props!.onPick!({ kind: 'peer', id: 'a1' }, poseFor(scene, 0)))
+  act(() => viewer.props!.onPick!('a1', poseFor(scene, 0)))
   expect(screen.getByLabelText('Alex up close')).toBeTruthy()
   await change({ peers: [] })
   expect(screen.queryByLabelText('Alex up close')).toBeNull()

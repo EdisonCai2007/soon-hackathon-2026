@@ -1,6 +1,6 @@
 # Take notes out of ROAM
 
-**Status:** planned — saved for review; nothing built yet.
+**Status:** built — publishing; the phone walk on staging waits on the owner.
 **Branch:** remove-notes
 **Open questions:** none
 
@@ -74,6 +74,7 @@ None.
 - `roam-notes`: retired; every requirement removed.
 - `roam-ar-view`: the scan over the real room no longer mentions notes; it is drawn on the walk screen, and a phone that cannot carry it keeps lining up and walking.
 - `roam-gestures`: a technique's "changes nothing" list no longer names notes.
+- `roam-scene`: a press that starts on the movement control lands on no person, with no marker left to name.
 
 ## Impact
 
@@ -94,3 +95,6 @@ None.
 - **2026-10-25** — Assumed: the AR fixes found while building notes stay — the render layer that makes a pose arrive, the overlay that makes buttons reachable, and `pick` updating matrices before it hits anything — because the camera screen and the walk need them.
 - **2026-10-25** — Evidence gap: the test site's database could not be read from here, so whether the note tables exist there is unknown. The drop migration covers both cases.
 - **2026-10-25** — Saved the plan alone on `remove-notes`, with nothing built. The deltas are not reconciled into `openspec/specs/` yet, because the code still has notes and the main specs say what the code does; the save after the build reconciles them (task 5.2).
+- **2026-10-25** — Found while building: `roam-scene`'s movement-control scenario still named a note marker, so a `roam-scene` delta now drops it. Nothing it describes changes.
+- **2026-10-25** — Built and checked locally: the ROAM tests at full coverage, types, lint, knip, jscpd and the key and action checks pass. The 30 other failures in `npm test` are outside ROAM (Windows path separators, CRLF and slow-machine timeouts in `access`, `inbox`, `style` and two Worker source scans), and the wiki check fails across untouched pages on this machine; CI is the gate. The deltas are reconciled into `openspec/specs/` and `roam-notes` is retired there by hand, so the archive skips specs.
+- **2026-10-25** — Asked whether to publish this branch, which also carries the unfinished `roam-ar-view` and `roam-gestures` work → chose shipping all of it on purpose.

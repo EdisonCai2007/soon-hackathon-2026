@@ -15,7 +15,7 @@ it('joins as a guest or as the camera from the address', () => {
   expect(arrivalFrom(`phone/${id}`)).toEqual({ kind: 'camera', roomId: id })
 })
 
-it('opens the phone’s note-leaving screen, which belongs to no room', () => {
+it('opens the phone’s walk screen, which belongs to no room', () => {
   expect(arrivalFrom('leave')).toEqual({ kind: 'leave' })
   expect(arrivalFrom('/leave/')).toEqual({ kind: 'leave' })
   // A room id after it is nobody's address.

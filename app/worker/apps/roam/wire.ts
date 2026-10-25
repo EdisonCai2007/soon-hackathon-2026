@@ -1,6 +1,6 @@
 // The live room's rules as plain functions: room.ts holds the sockets and calls these, so every rule is
 // tested without a runtime. What a page may send is checked here before anything is relayed.
-export type Pose = { x: number; y: number; z: number; yaw: number };
+type Pose = { x: number; y: number; z: number; yaw: number };
 export type Role = "guest" | "camera";
 export type Member = { id: string; name: string; color: string; role: Role; pose: Pose | null; castAt?: number };
 
@@ -52,8 +52,8 @@ export function colorFor(taken: readonly string[]): string {
 
 const placed = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= POSE_LIMIT;
 
-/** A place in the scan as a page sent it, or null: the same limits a live position is held to. */
-export function readPose(value: unknown): Pose | null {
+/** A position as a page sent it, or null when it falls outside the scan. */
+function readPose(value: unknown): Pose | null {
   if (typeof value !== "object" || value === null) return null;
   const { x, y, z, yaw } = value as Record<string, unknown>;
   return placed(x) && placed(y) && placed(z) && placed(yaw) ? { x, y, z, yaw } : null;

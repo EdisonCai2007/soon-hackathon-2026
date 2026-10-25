@@ -261,7 +261,7 @@ it('watches the person a press lands on, and nobody where a press lands on the r
   draw(1)
 
   canvas.dispatchEvent(new MouseEvent('click', { clientX: 400, clientY: 200 }))
-  expect(onPick).toHaveBeenCalledWith({ kind: 'peer', id: 'a1' }, cameraPose(viewing))
+  expect(onPick).toHaveBeenCalledWith('a1', cameraPose(viewing))
 
   onPick.mockClear()
   canvas.dispatchEvent(new MouseEvent('click', { clientX: 10, clientY: 10 }))

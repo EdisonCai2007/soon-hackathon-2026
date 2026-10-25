@@ -25,8 +25,8 @@
 
 ## 5. Drawing the scan in the session
 
-- [x] 5.1 `app/src/apps/roam/ar-view.ts`: owns the `WebGLRenderer` with `xr.enabled`, the `SparkRenderer`, the placed scan group and the animation loop; `take(session)` sets the reference space type and hands the session to `renderer.xr`; `lineUp(anchor, scene)` places the scan; `show(on)` turns the placed group's `visible` on and off; `dispose()` tears the lot down. Whether it starts shown is the caller's, since the note screen starts off and a guest starts on. The detail settings the probe measured are named constants in this one module — `lod: true` on the mesh, `enableLod` on the renderer, `lodSplatCount` 60,000, `lodRenderScale` 4, pixel ratio 0.6 and `maxStdDev` 2 — and the pose each frame comes from `renderer.xr.getCamera()`, not a second `getViewerPose`
-- [x] 5.2 The rolling frame-rate watch in the same module: below the floor for the set number of seconds, report it once and let the caller decide what to do about it — the note screen turns the scan off, a guest's walk ends; a `webglcontextlost` listener reports the same way, since the phone did lose the context at full detail
+- [x] 5.1 `app/src/apps/roam/ar-view.ts`: owns the `WebGLRenderer` with `xr.enabled`, the `SparkRenderer`, the placed scan group and the animation loop; `take(session)` sets the reference space type and hands the session to `renderer.xr`; `lineUp(anchor, scene)` places the scan; `show(on)` turns the placed group's `visible` on and off; `dispose()` tears the lot down. Whether it starts shown is the caller's, since the walk screen starts off and a guest starts on. The detail settings the probe measured are named constants in this one module — `lod: true` on the mesh, `enableLod` on the renderer, `lodSplatCount` 60,000, `lodRenderScale` 4, pixel ratio 0.6 and `maxStdDev` 2 — and the pose each frame comes from `renderer.xr.getCamera()`, not a second `getViewerPose`
+- [x] 5.2 The rolling frame-rate watch in the same module: below the floor for the set number of seconds, report it once and let the caller decide what to do about it — the walk screen turns the scan off, a guest's walk ends; a `webglcontextlost` listener reports the same way, since the phone did lose the context at full detail
 - [x] 5.3 `ar-session.ts`: `startAr(hooks, overlay, view?)` — with a `view`, skip the dummy layer, hand the session over, and read each pose inside the view's frame; with no `view`, behave exactly as today
 - [x] 5.4 `ar-view.test.ts` and the added cases in `ar-session.test.ts`: taking the session, placing on line-up, turning the scan on and off, the frame-rate floor firing and not firing, a failed renderer, tracking lost, stopping, and the unchanged no-`view` path; every branch covered
 
@@ -37,12 +37,12 @@
 - [ ] 6.3 `use-phone-ar.test.ts` covering it, and both screens moved onto it: `Phone.tsx` stays on the no-`view` `startAr` path, so its behaviour is identical
 - [ ] 6.4 Compare the two screens before and after. If neither reads more plainly, put the hook back, keep the rest of this change, and say why in the Decision log
 
-## 7. The phone's note screen
+## 7. The phone's walk screen
 
-- [ ] 7.1 `Leave.tsx`: build the view when a spot is picked, place it again on *Line up again*, dispose it when the session ends, and keep the existing spot picker, walking bar and compose panel unchanged
+- [ ] 7.1 `Leave.tsx`: build the view when a spot is picked, place it again on *Line up again*, dispose it when the session ends, and keep the existing spot picker and walking bar unchanged
 - [ ] 7.2 The *Scan on* / *Scan off* button beside the primary one with a tag saying which state it is in, starting off, and the line that appears when the phone could not carry the drawing
 - [ ] 7.3 Keep the module under the complexity the linter allows: the view's own lifecycle goes into its own hook beside the session hook from section 6, not inline
-- [ ] 7.4 `Leave.test.tsx`: the view is built and placed on picking a spot, placed again on lining up again, turned on and off by the button, turned off by the frame-rate floor with notes still working, and disposed when the session ends
+- [ ] 7.4 `Leave.test.tsx`: the view is built and placed on picking a spot, placed again on lining up again, turned on and off by the button, turned off by the frame-rate floor with lining up and walking still working, and disposed when the session ends
 
 ## 8. A thumb to move with
 
@@ -87,6 +87,6 @@
 - [ ] 13.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate the owner's phone actually held, and the difference between placing against a taped spot and placing against where a guest's view already stood
 - [ ] 13.2 `wiki/stack/live-rooms.md` and `wiki/stack/hand-signs.md`: what a phone and a laptop in a room can move with, and that the face reader shares the camera the hands already use
 - [ ] 13.3 `npm run lint`, `tsc -b`, the ROAM tests at 100% of lines, branches, functions and statements, `npm test`, `knip`, `jscpd`
-- [ ] 13.4 `/save`, then walk it on staging from the Android phone: the scan appears over the real home, holds its place over a few metres, turns off and on again, lines up again on each floor, and a note still lands where it was left
+- [ ] 13.4 `/save`, then walk it on staging from the Android phone: the scan appears over the real home, holds its place over a few metres, turns off and on again, and lines up again on each floor
 - [ ] 13.5 On the same staging deploy, join the room from a second phone and a laptop: the pad moves the guest and the others see it, *Walk it* puts them in the scan and their steps move them, carrying on keeps their place, stopping returns them to the page, and leaning shifts the laptop's view without moving the figure anybody else sees
 - [ ] 13.6 Record the frame rates and the alignment seen on both walks, and whether `PHONE_HEIGHT_M` now needs changing, as a follow-up rather than inside this change
