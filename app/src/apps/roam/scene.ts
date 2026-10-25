@@ -32,6 +32,13 @@ const FOV = 55
 /** The checked scene details; throws on anything else, so a bad file fails the load instead of the render. */
 export const parseScene = (data: unknown): Scene => sceneSchema.parse(data)
 
+/** The scan's details from the app's own files, checked. Throws, so each page says what it wants to say. */
+export async function loadScene(url: string): Promise<Scene> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return parseScene(await response.json())
+}
+
 /** The rotation that stands the scan upright, from the details' row-major 3×3 matrix. */
 export function displayQuaternion({ rotation: [a, b, c] }: Scene): Quaternion {
   const matrix = new Matrix4().set(a[0], a[1], a[2], 0, b[0], b[1], b[2], 0, c[0], c[1], c[2], 0, 0, 0, 0, 1)
@@ -58,6 +65,15 @@ export function poseFor(scene: Scene, view: View): Pose {
   const offset = [-0.68, 0.72, 0.86].map((step) => step * extent)
   return { position: target.map((value, axis) => value + offset[axis]) as Vec3, target, up: [0, 1, 0], fov: FOV }
 }
+
+/** A place and a facing in the scan, as a view jump: how somebody comes back to the page looking where they
+ *  had walked to. The facing is the scan's own, measured the way `anchorAt` measures it. */
+export const poseFacing = ({ x, y, z, yaw }: { x: number; y: number; z: number; yaw: number }): Pose => ({
+  position: [x, y, z],
+  target: [x + Math.sin(yaw), y, z + Math.cos(yaw)],
+  up: [0, 1, 0],
+  fov: FOV,
+})
 
 /** Where the camera stands right now, in the same shape a view jump uses, so it can be returned to. */
 export function cameraPose(camera: PerspectiveCamera): Pose {

@@ -53,5 +53,6 @@ Cloudflare [does not generate a Version URL for a Worker that implements a Durab
 - **Positions go up on a gate and are smoothed on the way in** — ten a second, interpolated between the last two — so figures glide rather than step.
 - **A remote stream needs an element.** Chrome will not let Web Audio pull from a remote `MediaStream` until a hidden, muted `<audio>` element in the page is playing it.
 - **Sound waits for a gesture.** The `AudioContext` starts suspended; resume it on the first press and say *sound off* until it runs.
+- **A press updates world matrices before it raycasts.** A raycast reads the matrix the last frame left behind, and a press can land between frames; without the update, a figure on a fresh page is judged to stand in the middle of the room.
 
-Part of [the Cloudflare stack](README.md). For a person physically in the room, see [AR in the browser](../development/ar-in-the-browser.md).
+Part of [the Cloudflare stack](README.md). For a person physically in the room, see [AR in the browser](../development/ar-in-the-browser.md); for the hand signs people make inside a room, see [hands read in the browser](hand-signs.md).

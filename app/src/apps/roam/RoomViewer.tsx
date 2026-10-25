@@ -1,16 +1,21 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { PerspectiveCamera, Scene as World, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
-import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark'
+import { SparkRenderer, type SplatMesh } from '@sparkjsdev/spark'
+import { makeCastStage, type Cast, type CastStage } from './casting-stage'
+import { STEPS, watchDetail, type Detail } from './detail'
 import { PovControls } from './pov-controls'
-import { applyPose, cameraPose, displayQuaternion, parseScene, type Pose } from './scene'
+import { applyPose, cameraPose, loadScene, type Pose } from './scene'
+import { loadSplats } from './splat-scene'
 import { dueToSend } from './pose-feed'
 import { addPeople, type People } from './people'
 import { makeStage, pointerAt, stanceOf, type Stage } from './stage'
+import { ThumbPad } from './ThumbPad'
+import { STILL, type Push } from './thumb-pad'
 import type { Peer } from './presence'
 import type { Pose as Stance } from './messages'
 import type { ViewerEvent } from './viewer-state'
 
-type Viewer = { camera: PerspectiveCamera; controls: PovControls; stage: Stage | null }
+type Viewer = { camera: PerspectiveCamera; controls: PovControls; stage: Stage | null; spells: CastStage | null }
 type Props = {
   sceneUrl: string
   splatUrl: string
@@ -20,10 +25,12 @@ type Props = {
   peers?: readonly Peer[]
   /** The sound card to place their voices on, once the browser has let sound start. */
   audio?: AudioContext | null
-  /** A press on somebody, with the camera pose to come back to. */
+  /** A press on somebody, by their peer id, with the camera pose to come back to. */
   onPick?: (id: string, pose: Pose) => void
   /** Where this page's own person stands, ten times a second, for the others to draw. */
   onStance?: (stance: Stance) => void
+  /** The techniques running right now, drawn where whoever cast them stands. */
+  casts?: readonly Cast[]
   /** Where the camera is and faces, ten times a second, for the page to show. */
   onWhere?: (pose: Pose) => void
 }
@@ -31,20 +38,19 @@ type Props = {
 // Three.js r180 draws with WebGL 2 alone, so a browser without it gets a plain message, not a blank box.
 const hasWebGL = () => document.createElement('canvas').getContext('webgl2') !== null
 
-async function loadScene(url: string) {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  return parseScene(await response.json())
-}
-
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
-export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance, onWhere }: Props) {
+export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance, onWhere,
+  casts = [] }: Props) {
   const host = useRef<HTMLDivElement>(null)
+  const wash = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
+  // A phone has no movement keys, so the pad appears the moment the view is touched and not before.
+  const [touched, setTouched] = useState(false)
+  const push = useRef<Push>(STILL)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, onPick, onStance, onWhere })
-  useEffect(() => { latest.current = { peers, onPick, onStance, onWhere } })
+  const latest = useRef({ peers, onPick, onStance, casts, onWhere })
+  useEffect(() => { latest.current = { peers, onPick, onStance, casts, onWhere } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -52,12 +58,12 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       return
     }
     const box = host.current!
+    const washing = wash.current!
     let stopped = false
     const fail = (message: string) => {
       if (!stopped) onEvent({ type: 'error', message })
     }
     const renderer = new WebGLRenderer({ antialias: false, powerPreference: 'high-performance' })
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
     renderer.setClearColor('#10151c')
     renderer.outputColorSpace = SRGBColorSpace
     box.appendChild(renderer.domElement)
@@ -73,7 +79,17 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
     }
-    resize()
+    // Spark's own tree does the culling, so the page only says how much to draw and lets it pick which splats.
+    const detailed = (detail: Detail) => {
+      spark.maxStdDev = detail.stdDev
+      spark.enableLod = detail.lod
+      spark.lodRenderScale = detail.renderScale
+      if (detail.splats) spark.lodSplatCount = detail.splats
+      spark.lodDirty = true
+      renderer.setPixelRatio(Math.min(devicePixelRatio, detail.pixels))
+      resize()
+    }
+    detailed(STEPS[0])
     const observer = new ResizeObserver(resize)
     observer.observe(box)
     const lost = (event: Event) => {
@@ -87,8 +103,8 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       const stage = viewer.current?.stage
       const pick = latest.current.onPick
       if (!stage || !pick) return
-      const id = stage.pick(pointerAt(event, renderer.domElement.getBoundingClientRect(), pointer), camera)
-      if (id) pick(id, cameraPose(camera))
+      const found = stage.pick(pointerAt(event, renderer.domElement.getBoundingClientRect(), pointer), camera)
+      if (found) pick(found, cameraPose(camera))
     }
     renderer.domElement.addEventListener('click', picked)
     let splats: SplatMesh | undefined
@@ -97,20 +113,20 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
     void (async () => {
       const scene = await loadScene(sceneUrl)
       if (stopped) return
-      splats = new SplatMesh({
+      splats = loadSplats(scene, {
         url: splatUrl,
+        // The tree is built whether or not it is used, because turning it on later would mean loading again.
+        lod: true,
         onProgress: ({ loaded, total }) => {
           if (total && !stopped) onEvent({ type: 'progress', progress: loaded / total })
         },
       })
-      splats.quaternion.copy(displayQuaternion(scene))
-      splats.position.fromArray(scene.translation)
       world.add(splats)
       await splats.initialized
       if (stopped) return
       const stage = makeStage(world, scene, audio)
+      const spells = makeCastStage(world, scene)
       stage.sync(latest.current.peers)
-      viewer.current = { camera, controls, stage }
       // The filmed people arrive after the room: a model that fails to load leaves the scan as it was.
       void addPeople(world, scene).then((loaded) => {
         if (stopped) loaded.dispose()
@@ -118,12 +134,17 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
       }, (error: unknown) => console.error(error))
       let previous: number | null = null
       let told: number | null = null
+      const watch = watchDetail(detailed)
       renderer.setAnimationLoop((time) => {
+        watch.frame(time)
+        controls.push(push.current)
         const seconds = previous === null ? 0 : (time - previous) / 1000
         controls.update(seconds)
         people?.update(seconds)
         previous = time
         stage.update(camera, time)
+        // A technique is drawn over the room's people, and its brightest moment washes the whole view.
+        washing.style.opacity = String(spells.draw(latest.current.casts, time))
         // The others are told where this person stands on the same gate their figures are drawn on.
         if (dueToSend(told, time)) {
           told = time
@@ -132,6 +153,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
         }
         renderer.render(world, camera)
       })
+      viewer.current = { camera, controls, stage, spells }
       onEvent({ type: 'ready', scene })
     })().catch((error: unknown) => {
       console.error(error)
@@ -141,6 +163,7 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
     return () => {
       stopped = true
       viewer.current?.stage?.dispose()
+      viewer.current?.spells?.dispose()
       viewer.current = null
       people?.dispose()
       observer.disconnect()
@@ -165,5 +188,12 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
   // Who is in the room changes as people come and go; the figures follow.
   useEffect(() => { viewer.current?.stage?.sync(peers) }, [peers])
 
-  return <div ref={host} className="absolute inset-0" />
+  const touch = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') setTouched(true)
+  }
+
+  return <div ref={host} className="absolute inset-0" onPointerDown={touch}>
+    <div ref={wash} className="pointer-events-none absolute inset-0 z-10 bg-white opacity-0" aria-hidden="true" />
+    {touched && <ThumbPad onPush={(moved) => { push.current = moved }} />}
+  </div>
 }

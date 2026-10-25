@@ -7,6 +7,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { Mesh, Scene as World, Vector3, type PerspectiveCamera } from 'three'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { STEPS } from './detail'
 import { figureSize, floorHeight } from './placement'
 import { nextMotion, SEND_INTERVAL_MS } from './pose-feed'
 import type { Peer } from './presence'
@@ -16,7 +17,7 @@ import { cameraPose, displayQuaternion, parseScene, poseFor } from './scene'
 // The GPU parts are stood in: a renderer that draws nothing, and a splat mesh whose loading each test finishes.
 const fakes = vi.hoisted(() => ({
   renderers: [] as { domElement: HTMLCanvasElement; setSize: ReturnType<typeof vi.fn>; setAnimationLoop: ReturnType<typeof vi.fn>; render: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }[],
-  sparks: [] as { dispose: ReturnType<typeof vi.fn> }[],
+  sparks: [] as { dispose: ReturnType<typeof vi.fn>; enableLod: boolean; lodSplatCount: number; lodRenderScale: number; maxStdDev: number }[],
   splats: [] as { options: { url: string; onProgress: (event: { loaded: number; total: number }) => void }; finish: () => void; fail: (error: Error) => void; dispose: ReturnType<typeof vi.fn>; quaternion: { toArray: () => number[] }; position: { toArray: () => number[] } }[],
 }))
 
@@ -40,6 +41,11 @@ vi.mock('@sparkjsdev/spark', async () => {
   const { Object3D } = await vi.importActual<typeof import('three')>('three')
   class SparkRenderer extends Object3D {
     dispose = vi.fn()
+    maxStdDev = 0
+    enableLod = false
+    lodRenderScale = 0
+    lodSplatCount = 0
+    lodDirty = false
     constructor() { super(); fakes.sparks.push(this) }
   }
   class SplatMesh extends Object3D {
@@ -253,7 +259,7 @@ it('lets go of everything when it leaves the page, and reports nothing after', a
 })
 
 const peer = (id: string, at: { x: number; y: number; z: number }): Peer =>
-  ({ member: { id, name: id, color: '#f97362', role: 'guest', pose: null }, motion: nextMotion(null, { ...at, yaw: 0 }, 0), stream: null })
+  ({ member: { id, name: id, color: '#f97362', role: 'guest', pose: null }, motion: nextMotion(null, { ...at, yaw: 0 }, 0), stream: null, cast: null })
 
 const live = async (props: Partial<ComponentProps<typeof RoomViewer>> = {}) => {
   const onEvent = vi.fn()
@@ -334,6 +340,61 @@ it('places the voices on the sound card the page hands it', async () => {
   draw(0)
   expect(createMediaStreamSource).toHaveBeenCalledWith(stream)
   expect(audio.listener.setPosition).toHaveBeenCalled()
+})
+
+it('draws everything while the rate holds, and gives up detail where it cannot', async () => {
+  const { draw } = await live()
+  const spark = fakes.sparks[fakes.sparks.length - 1]
+  expect(spark.enableLod).toBe(false)
+  // Two seconds of warm-up, then two and a half at four frames a second: too slow, for long enough to matter.
+  let time = 0
+  for (let frame = 0; frame < 18; frame += 1) {
+    time += 250
+    draw(time)
+  }
+  expect(spark.enableLod).toBe(true)
+  expect(spark.lodSplatCount).toBe(STEPS[1].splats)
+  expect(spark.maxStdDev).toBe(STEPS[1].stdDev)
+})
+
+const pointer = (target: Element, type: string, init: { pointerType?: string; clientX?: number; clientY?: number } = {}) =>
+  target.dispatchEvent(Object.assign(
+    new MouseEvent(type, { bubbles: true, clientX: init.clientX ?? 0, clientY: init.clientY ?? 0 }),
+    { pointerId: 1, pointerType: init.pointerType ?? 'mouse' },
+  ))
+
+it('gives a touched view a pad to walk with, and a press on the pad reaches nobody', async () => {
+  const onPick = vi.fn()
+  const { container, draw, renderer } = await live({ peers: [peer('a1', { x: 0, y: 0, z: 0 })], onPick })
+  const label = '[aria-label="Move through the room"]'
+  const box = container.firstElementChild!
+  act(() => { pointer(box, 'pointerdown') })
+  expect(container.querySelector(label)).toBeNull()
+  act(() => { pointer(box, 'pointerdown', { pointerType: 'touch' }) })
+  const pad = container.querySelector(label)!
+  pad.setPointerCapture = vi.fn()
+
+  draw(0)
+  const camera = renderer.render.mock.calls[0][1] as PerspectiveCamera
+  const standing = camera.position.clone()
+  act(() => {
+    pointer(pad, 'pointerdown', { clientX: 100, clientY: 100 })
+    pointer(pad, 'pointermove', { clientX: 100, clientY: 20 })
+  })
+  draw(100)
+  expect(camera.position.distanceTo(standing)).toBeGreaterThan(0)
+
+  act(() => { pointer(pad, 'pointerup', { clientX: 100, clientY: 20 }) })
+  const resting = camera.position.clone()
+  // A second finger's drag, and a drag after letting go, both belong to nobody: the camera stays put.
+  act(() => {
+    pad.dispatchEvent(Object.assign(new MouseEvent('pointermove', { bubbles: true, clientX: 100, clientY: 20 }), { pointerId: 2 }))
+    pointer(pad, 'pointermove', { clientX: 100, clientY: 20 })
+  })
+  draw(200)
+  draw(300)
+  expect(camera.position.equals(resting)).toBe(true)
+  expect(onPick).not.toHaveBeenCalled()
 })
 
 it('ignores a press on the room when the page is not listening for one', async () => {

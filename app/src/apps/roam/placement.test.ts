@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { anchorAt, billboardYaw, figureSize, floorHeight, PHONE_HEIGHT_M, sceneExtent, standing, toScanPose, unitsPerMetre } from './placement'
+import { anchorAt, billboardYaw, figureSize, floorHeight, fromOrigin, PHONE_HEIGHT_M, sceneExtent, standing, toScanPose, unitsPerMetre } from './placement'
 import { parseScene, type Scene } from './scene'
 
 // The real scan, so the scale these numbers carry is the one the demo runs on.
@@ -75,4 +75,17 @@ it('turns a figure to face the viewer, wherever the viewer is', () => {
   expect(billboardYaw({ x: 0, z: 0 }, { x: 5, z: 0 })).toBeCloseTo(Math.PI / 2)
   // Directly above, where there is no direction to face, is answered rather than left undefined.
   expect(billboardYaw({ x: 0, z: 0 }, { x: 0, z: 0 })).toBe(0)
+})
+
+it('measures a walk from a new starting point, keeping where it had reached', () => {
+  const origin = { x: 1, y: 0, z: 1, yaw: 0 }
+  // Standing still at the new origin means no movement at all.
+  expect(fromOrigin(origin, origin)).toMatchObject({ x: 0, y: 0, z: 0, yaw: 0 })
+  // A metre further along the way it was facing, whichever way that was.
+  expect(fromOrigin({ x: 1, y: 0, z: 2, yaw: 0 }, origin)).toMatchObject({ x: 0, z: 1 })
+  const turned = fromOrigin({ x: 2, y: 0.5, z: 1, yaw: Math.PI / 2 }, { ...origin, yaw: Math.PI / 2 })
+  expect(turned.z).toBeCloseTo(1, 6)
+  expect(turned.x).toBeCloseTo(0, 6)
+  expect(turned.y).toBe(0.5)
+  expect(turned.yaw).toBeCloseTo(0, 6)
 })

@@ -1,8 +1,10 @@
 // What the page accepts off the room's socket. The room checks what it relays; this checks what arrives,
 // so a page never draws a figure from a message it could not read.
 import { z } from 'zod'
+import { TECHNIQUE_NAMES, type TechniqueName } from './techniques'
 
 const poseSchema = z.object({ x: z.number(), y: z.number(), z: z.number(), yaw: z.number() })
+const techniqueSchema = z.enum(TECHNIQUE_NAMES)
 
 const memberSchema = z.object({
   id: z.string().min(1),
@@ -18,6 +20,7 @@ const messageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('left'), id: z.string().min(1) }),
   z.object({ type: z.literal('pose'), id: z.string().min(1), pose: poseSchema }),
   z.object({ type: z.literal('signal'), from: z.string().min(1), data: z.unknown() }),
+  z.object({ type: z.literal('cast'), id: z.string().min(1), technique: techniqueSchema }),
   z.object({ type: z.literal('closed'), reason: z.enum(['full', 'removed']) }),
 ])
 
@@ -36,8 +39,10 @@ export function readRoomMessage(raw: unknown): RoomMessage | null {
   }
 }
 
-/** What this page sends: its own position, a handshake for one other person, or a removal as the host. */
+/** What this page sends: its own position, a handshake for one other person, a technique it cast, or a
+ *  removal as the host. */
 export type Sent =
   | { type: 'pose'; pose: Pose }
   | { type: 'signal'; to: string; data: unknown }
   | { type: 'remove'; id: string; key: string }
+  | { type: 'cast'; technique: TechniqueName }

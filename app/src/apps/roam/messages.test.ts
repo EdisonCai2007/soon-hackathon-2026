@@ -12,6 +12,7 @@ it('reads every message the room sends', () => {
   expect(read({ type: 'left', id: 'a1' })).toEqual({ type: 'left', id: 'a1' })
   expect(read({ type: 'pose', id: 'a1', pose })).toEqual({ type: 'pose', id: 'a1', pose })
   expect(read({ type: 'signal', from: 'a1', data: { sdp: 'v=0' } })).toEqual({ type: 'signal', from: 'a1', data: { sdp: 'v=0' } })
+  expect(read({ type: 'cast', id: 'a1', technique: 'purple' })).toEqual({ type: 'cast', id: 'a1', technique: 'purple' })
   expect(read({ type: 'closed', reason: 'full' })).toEqual({ type: 'closed', reason: 'full' })
   expect(read({ type: 'closed', reason: 'removed' })).toEqual({ type: 'closed', reason: 'removed' })
 })
@@ -25,4 +26,5 @@ it('refuses anything it can not act on', () => {
   expect(read({ type: 'joined', member: { ...member, role: 'owner' } })).toBeNull()
   expect(read({ type: 'welcome', self: member, members: [], capacity: 0 })).toBeNull()
   expect(read({ type: 'closed', reason: 'bored' })).toBeNull()
+  expect(read({ type: 'cast', id: 'a1', technique: 'fireball' })).toBeNull()
 })

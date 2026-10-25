@@ -19,6 +19,18 @@ const TAIL = 15;
 const SECRET = 'SAVED_SECRET';
 const lines = (count, line) => `${Array.from({ length: count }, (_, index) => line(index)).join('\n')}\n`;
 const WRONG_TYPE = 'export const count: number = "text";\n';
+
+// Every Durable Object class the app's runtime harness binds. The proof's own worker has to export them
+// too: workerd refuses to start a binding whose class is missing, and then no sample proves anything.
+function boundClasses(app) {
+  const setup = join(app, 'tests', 'runtime', 'setup.ts');
+  if (!existsSync(setup)) return [];
+  return [...new Set([...readFileSync(setup, 'utf8').matchAll(/class_name:\s*"(\w+)"/g)].map(found => found[1]))];
+}
+
+const stubWorker = app => `${boundClasses(app).map(name =>
+  `export class ${name} {\n  fetch() {\n    return new Response("${name}");\n  }\n}\n`).join('')
+}export default { fetch: () => new Response("runtime reached") };\n`;
 const repeated = name => `export function ${name}(input: number): number {\n  let total = input;\n${
   lines(38, index => `  total += input * ${index + 2};`)}  return total;\n}\n`;
 
@@ -66,11 +78,11 @@ export const GATES = [
     settings: ['vitest.config.runtime.ts', 'tests/runtime/setup.ts'],
     also: () => ['../scripts/lib-wrangler-config.mjs', '../scripts/lib-cli.mjs', '../.claude/skills/memory/scripts/lib/cli.mjs'],
     requires: 'runtime proof: workerd ready',
-    files: {
+    files: app => ({
       'wrangler.jsonc': JSON.stringify({ compatibility_date: '2026-09-26', compatibility_flags: ['nodejs_compat', 'disallow_importable_env'] }),
-      'worker/index.ts': 'export default { fetch: () => new Response("runtime reached") };\n',
+      'worker/index.ts': stubWorker(app),
       '../schema/migrations/0001_runtime.sql': 'CREATE TABLE runtime_proof (id INTEGER PRIMARY KEY);\n',
-    },
+    }),
     samples: [{ file: 'tests/runtime/runtime.test.ts', says: 'RUNTIME_ASSERTION_PROOF', text:
       'import { afterAll, beforeAll, expect, it } from "vitest";\nimport { startRuntime, type Runtime } from "./setup.ts";\n'
       + 'let runtime: Runtime;\nbeforeAll(async () => { runtime = await startRuntime(); });\n'
@@ -133,7 +145,8 @@ function sampleApp(work, app, gate, samples) {
   for (const path of ['package.json', ...gate.settings, ...(gate.also?.(app) ?? [])]) {
     if (existsSync(join(app, path))) cpSync(join(app, path), join(folder, path), { recursive: true });
   }
-  for (const [path, text] of [...Object.entries(gate.files ?? {}), ...samples.map(sample => [sample.file, sample.text])]) write(folder, path, text);
+  const beside = typeof gate.files === 'function' ? gate.files(app) : gate.files ?? {};
+  for (const [path, text] of [...Object.entries(beside), ...samples.map(sample => [sample.file, sample.text])]) write(folder, path, text);
   return folder;
 }
 

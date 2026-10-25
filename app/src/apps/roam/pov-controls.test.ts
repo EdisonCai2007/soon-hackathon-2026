@@ -154,6 +154,37 @@ it('scrolls forward and back by lines, pages or pixels, and keeps the menu away'
   expect(menu.defaultPrevented).toBe(true)
 })
 
+it('walks on a push from the pad, at the strength it was pulled, for that frame alone', () => {
+  const { camera, controls, near } = setup()
+  controls.push({ forward: 1, side: 0 })
+  controls.update(0.1)
+  near(camera.position.z, 3.9)
+
+  controls.push({ forward: 0.5, side: 0 })
+  controls.update(0.1)
+  near(camera.position.z, 3.85)
+
+  // Nothing is pushed for the next frame, so the camera stops without anybody letting go.
+  const resting = camera.position.clone()
+  controls.update(0.1)
+  expect(camera.position.equals(resting)).toBe(true)
+})
+
+it('adds a push to the keys, clamps a wild one, and drops it on a view jump', () => {
+  const { camera, controls, key, near } = setup()
+  key('keydown', 'KeyD')
+  controls.push({ forward: 0, side: 9 })
+  controls.update(0.1)
+  key('keyup', 'KeyD')
+  near(camera.position.x, 2.1)
+
+  controls.push({ forward: 1, side: 0 })
+  controls.sync()
+  const jumped = camera.position.clone()
+  controls.update(0.1)
+  expect(camera.position.equals(jumped)).toBe(true)
+})
+
 it('takes up the camera’s new direction after a jump, and stops listening once disposed', () => {
   const { camera, controls, key } = setup()
   camera.lookAt(3, 3, 4)

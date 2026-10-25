@@ -1,4 +1,4 @@
-import { useReducer, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useReducer, useRef, useState, type ComponentProps, type ReactNode, type RefObject } from 'react'
 import { Loading } from '@/components/Loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -6,10 +6,12 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useCasts, useTechniqueSounds, type Casting } from './casting'
 import type { Pose as Stance } from './messages'
 import type { Peer } from './presence'
 import { RoomViewer } from './RoomViewer'
-import type { Pose, View } from './scene'
+import type { Pose, Scene, View } from './scene'
+import { useRoomAr, type RoomAr } from './use-room-ar'
 import { initialViewer, viewerReducer, type ViewerEvent, type ViewerState } from './viewer-state'
 import { Watch } from './Watch'
 
@@ -25,6 +27,21 @@ export type Live = {
   tell: (stance: Stance) => void
   people: ReactNode
   notice?: ReactNode
+  /** Hand reading for this page: off until the person asks for it. */
+  casting: Casting
+}
+
+const CANNOT_READ = 'This browser can’t read your hands.'
+
+function Hands({ casting }: { casting: Casting }) {
+  const reading = casting.step === 'on' || casting.step === 'starting'
+  return <>
+    {casting.step === 'on' && <Badge>hands on</Badge>}
+    {casting.step === 'starting' && <Badge variant="outline">reading your hands…</Badge>}
+    {casting.step === 'cannot' && <Badge variant="outline">{CANNOT_READ}</Badge>}
+    {casting.seen && <Badge variant="outline">{`seeing: ${casting.seen}`}</Badge>}
+    <Button type="button" variant="outline" onClick={casting.turn}>{reading ? 'Hands off' : 'Hands on'}</Button>
+  </>
 }
 
 const loadingLabel = (progress: number | null) =>
@@ -46,11 +63,21 @@ const fill = (box: HTMLElement | null) => {
 type Ready = Extract<ViewerState, { status: 'ready' }> | null
 type Act = (event: ViewerEvent) => void
 
-function Bar({ ready, live, act, box }: { ready: Ready; live?: Live; act: Act; box: HTMLElement | null }) {
+/** Walking the scan with your own feet, where the phone can follow them. It takes where the view already
+ *  stands as its starting point, so it waits for the viewer to say where that is. */
+function Walk({ walk, stance }: { walk: RoomAr; stance: Stance | null }) {
+  if (!walk.offered || walk.walking || !stance) return null
+  return <Button type="button" variant="outline" onClick={() => walk.start(stance)}>Walk it</Button>
+}
+
+function Bar({ ready, live, act, box, walk, stance }:
+{ ready: Ready; live?: Live; act: Act; box: HTMLElement | null; walk: RoomAr; stance: Stance | null }) {
   return <div className="mb-4 flex flex-wrap items-center gap-3">
     <h1>ROAM</h1>
     {ready && <Badge variant="secondary">{ready.scene.views} video views · {ready.scene.splats.toLocaleString('en-US')} splats</Badge>}
     {live?.soundBlocked && <Badge variant="outline">sound off</Badge>}
+    {live && <Hands casting={live.casting} />}
+    <Walk walk={walk} stance={stance} />
     <div className="ml-auto flex flex-wrap gap-2">
       {VIEWS.map(([view, label]) => (
         <Button key={label} type="button" variant="outline" disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Button>
@@ -67,6 +94,41 @@ function Cameras({ ready, act }: { ready: Ready; act: Act }) {
       {ready?.scene.cameras.map((camera, index) => <NativeSelectOption key={camera.name} value={index}>{camera.name}</NativeSelectOption>)}
     </NativeSelect>
     <p className="text-sm text-muted-foreground">Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster</p>
+  </div>
+}
+
+type ViewProps = {
+  app: string
+  live?: Live
+  scene: Scene | null
+  pose: Pose | null
+  act: Act
+  onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
+  stance: Stance | null
+  onStance: (stance: Stance) => void
+  onWhere: (pose: Pose) => void
+}
+
+/** The scan itself, with the techniques running over it and where this person's own view stands. */
+function View({ app, live, scene, pose, act, onPick, stance, onStance, onWhere }: ViewProps) {
+  const casts = useCasts(live?.peers, live?.casting.mine, stance)
+  useTechniqueSounds(live?.audio, casts, scene, stance)
+  return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
+    peers={live?.peers} audio={live?.audio} casts={casts} onPick={onPick} onStance={onStance}
+    onWhere={onWhere} />
+}
+
+/** While the walk runs, the session owns the screen, so these are the page's only visible controls. */
+function Walking({ walk, overlay }: { walk: RoomAr; overlay: RefObject<HTMLDivElement | null> }) {
+  // The element stays in the page whether or not a session is running, so React keeps owning it.
+  return <div ref={overlay} className={walk.walking ? 'fixed inset-x-0 bottom-0 z-30 grid gap-3 bg-black/70 p-4' : 'hidden'}>
+    {walk.walking && <>
+      <p role="status" className="text-white">You’re in the home. Turn your body to look, and walk.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" onClick={walk.carryOn}>Carry on from here</Button>
+        <Button type="button" variant="outline" onClick={walk.stop}>Stop</Button>
+      </div>
+    </>}
   </div>
 }
 
@@ -106,22 +168,32 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
   const [state, dispatch] = useReducer(viewerReducer, initialViewer)
   const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [watching, setWatching] = useState<{ id: string; saved: Pose } | null>(null)
+  const [stance, setStance] = useState<Stance | null>(null)
   const [where, setWhere] = useState<Pose | null>(null)
   const ready = state.status === 'ready' ? state : null
   const watched = live?.peers.find((peer) => peer.member.id === watching?.id) ?? null
+  const scene = ready?.scene ?? null
+  const overlay = useRef<HTMLDivElement>(null)
+  const tell = live?.tell
+  const walk = useRoomAr(`/apps/${app}/room.spz`, scene, {
+    onStance: tell,
+    onLeft: useCallback((pose: Pose) => dispatch({ type: 'look', pose }), []),
+    overlay,
+  })
 
   return (
     <div onPointerDown={live?.unlock}>
-      <Bar ready={ready} live={live} act={dispatch} box={box} />
+      <Bar ready={ready} live={live} act={dispatch} box={box} walk={walk} stance={stance} />
       {before}
+      {walk.trouble && <p role="alert" className="mb-3 text-sm text-muted-foreground">{walk.trouble}</p>}
       <Cameras ready={ready} act={dispatch} />
       <Where where={ready && where} />
       {state.status === 'error' || state.status === 'no-webgl'
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
         : <div ref={setBox} className="relative h-[70vh] min-h-80 overflow-hidden rounded-xl border bg-[#10151c]">
-          <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={ready?.pose ?? null} onEvent={dispatch}
-            peers={live?.peers} audio={live?.audio} onStance={live?.tell} onWhere={setWhere}
-            onPick={live && ((id, saved) => setWatching({ id, saved }))} />
+          <View app={app} live={live} scene={scene} pose={ready?.pose ?? null} act={dispatch} stance={stance}
+            onStance={(here) => { setStance(here); tell?.(here) }} onWhere={setWhere}
+            onPick={(id, saved) => { if (live) setWatching({ id, saved }) }} />
           {state.status === 'loading' && <div className="absolute inset-0">
             <Loading label={loadingLabel(state.progress)} className="h-full"><Skeleton className="h-full rounded-none" /></Loading>
           </div>}
@@ -131,6 +203,7 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
           }} />}
         </div>}
       {live && <div className="mt-4">{live.people}</div>}
+      <Walking walk={walk} overlay={overlay} />
     </div>
   )
 }

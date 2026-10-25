@@ -28,4 +28,6 @@ A test that passes on your computer and fails now and then on the automatic chec
 
 Local workerd checks runtime and D1 behavior, but cannot establish the hosted Access policy, a live provider's availability, or the screen's behavior in a browser. Keep the [deployed check](../development/staging-walkthrough.md) for those questions. The automatic checks remain [the publishing gate](../development/the-change-loop.md#the-gate).
 
+**A D1 `BLOB` comes back as an array of byte values**, not an `ArrayBuffer`. `new Response(row.media)` on that array answers 200, with the right content type and an empty body; convert it with `new Uint8Array(row.media)` first. A unit test's SQLite stand-in returns the bytes themselves, so test both shapes.
+
 Part of the [Cloudflare stack](README.md).
