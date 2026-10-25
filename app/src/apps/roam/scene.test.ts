@@ -79,3 +79,15 @@ it('comes back to a place and a facing in the scan', () => {
   expect(turned.target[0]).toBeCloseTo(1, 6)
   expect(turned.target[2]).toBeCloseTo(0, 6)
 })
+
+it('round trips camera Euler headings through the scan-facing convention', () => {
+  for (const yaw of [0, 0.7, -1.2, Math.PI / 2, Math.PI, -Math.PI]) {
+    const camera = new PerspectiveCamera()
+    camera.rotation.set(0, yaw, 0, 'YXZ')
+    const direction = camera.getWorldDirection(new Vector3())
+    const returned = new PerspectiveCamera()
+    applyPose(returned, poseFacing({ x: 2, y: -0.3, z: 4, yaw: yaw + Math.PI }))
+    expect(returned.position.toArray()).toEqual([2, -0.3, 4])
+    expect(returned.getWorldDirection(new Vector3()).distanceTo(direction)).toBeLessThan(1e-6)
+  }
+})

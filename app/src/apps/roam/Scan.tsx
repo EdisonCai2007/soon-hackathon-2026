@@ -90,7 +90,7 @@ function Bar({ app, tools, ready, live, act, box, walk, stance }: BarProps) {
     <div className="absolute top-6 left-1/2 z-20 flex -translate-x-1/2 items-start gap-3 max-md:top-24">
       <Joined className={ready ? undefined : 'opacity-40'}>
         {VIEWS.map(([view, label]) => (
-          <Pill key={label} type="button" className={cn(MAIN, 'disabled:opacity-100')} disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Pill>
+          <Pill key={label} type="button" className={cn(MAIN, 'disabled:opacity-100')} disabled={!ready || walk.walking} onClick={() => act({ type: 'go', view })}>{label}</Pill>
         ))}
       </Joined>
       {live && <WhosIn live={live} open={open} toggle={() => setOpen(!open)} />}
@@ -123,15 +123,16 @@ type ViewProps = {
   stance: Stance | null
   onStance: (stance: Stance) => void
   onWhere?: (pose: Pose) => void
+  paused: boolean
 }
 
 /** The scan itself, with the techniques running over it and where this person's own view stands. */
-function View({ app, live, scene, pose, act, onPick, stance, onStance, onWhere }: ViewProps) {
+function View({ app, live, scene, pose, act, onPick, stance, onStance, onWhere, paused }: ViewProps) {
   const casts = useCasts(live?.peers, live?.casting.mine, stance)
   useTechniqueSounds(live?.audio, casts, scene, stance)
   return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
     peers={live?.peers} audio={live?.audio} casts={casts} onPick={onPick} onStance={onStance}
-    onWhere={onWhere} />
+    onWhere={onWhere} paused={paused} />
 }
 
 /** The scanned room filling the screen: walked alone, or shared with whoever a live room holds. */
@@ -148,7 +149,7 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
   const overlay = useRef<HTMLDivElement>(null)
   const tell = live?.tell
   const walk = useRoomAr(`/apps/${app}/room.spz`, ready?.scene ?? null, {
-    onStance: tell,
+    onStance: useCallback((here: Stance) => { setStance(here); tell?.(here) }, [tell]),
     onLeft: useCallback((pose: Pose) => dispatch({ type: 'look', pose }), []),
     overlay,
   })
@@ -157,13 +158,17 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
     <div ref={setBox} onPointerDown={live?.unlock} className={cn('absolute inset-0 overflow-hidden', stopped ? 'grid place-items-center p-6' : 'bg-[#10151c]')}>
       {stopped
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
-        : <View app={app} live={live} scene={ready?.scene ?? null} pose={ready?.pose ?? null} act={dispatch} stance={stance}
-          onStance={(here) => { setStance(here); tell?.(here) }} onWhere={tools ? setWhere : undefined}
+        : <View app={app} live={live} scene={ready?.scene ?? null} pose={ready?.pose ?? null} act={dispatch} stance={stance} paused={walk.walking}
+          onStance={(here) => {
+            if (!walk.acceptsView(here)) return
+            setStance(here)
+            tell?.(here)
+          }} onWhere={tools ? setWhere : undefined}
           onPick={(id, saved) => { if (live) setWatching({ id, saved }) }} />}
       {state.status === 'loading' && <Gathering progress={state.progress} />}
       <Bar app={app} tools={tools} ready={ready} live={live} act={dispatch} box={box} walk={walk} stance={stance} />
       <div className="absolute inset-x-6 bottom-6 z-20 flex flex-wrap items-end justify-between gap-3">
-        {tools && <Placing ready={ready} where={where} go={(view) => dispatch({ type: 'go', view })} />}
+        {tools && <Placing ready={ready} where={where} go={(view) => { if (!walk.walking) dispatch({ type: 'go', view }) }} />}
         <div className="grid gap-1 text-sm font-medium text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]">
           {walk.trouble && <p role="alert">{walk.trouble}</p>}
           <p>Click the scene, then W/A/S/D to move · Q/E down and up · drag to look · Shift to go faster</p>

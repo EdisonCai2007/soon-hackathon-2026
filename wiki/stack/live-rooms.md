@@ -54,5 +54,7 @@ Cloudflare [does not generate a Version URL for a Worker that implements a Durab
 - **A remote stream needs an element.** Chrome will not let Web Audio pull from a remote `MediaStream` until a hidden, muted `<audio>` element in the page is playing it.
 - **Sound waits for a gesture.** The `AudioContext` starts suspended; resume it on the first press and say *sound off* until it runs.
 - **A press updates world matrices before it raycasts.** A raycast reads the matrix the last frame left behind, and a press can land between frames; without the update, a figure on a fresh page is judged to stand in the middle of the room.
+- **Only the active movement mode reports a position.** A physical walk pauses ordinary drawing and controls. Its valid poses update both the local stance and the shared position. On exit, apply the reached viewpoint before allowing ordinary callbacks to report again; a hidden old camera must not move the participant back.
+- **Joining does not grant tracking permission.** The phone offers *Walk it* once its scan is ready. That explicit tap starts tracking; waiting, lost tracking and refusal are visible, with ordinary controls kept as the fallback. The shared coordinate rules live in [AR in the browser](../development/ar-in-the-browser.md#keep-the-tracked-and-drawn-starting-points-identical).
 
 Part of [the Cloudflare stack](README.md). For a person physically in the room, see [AR in the browser](../development/ar-in-the-browser.md); for the hand signs people make inside a room, see [hands read in the browser](hand-signs.md).

@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Casting } from './casting'
+import type { ArViewHooks } from './ar-view'
 import type { RoomViewer } from './RoomViewer'
 import { anchorAt } from './placement'
 import { parseScene } from './scene'
@@ -23,7 +24,7 @@ vi.mock('./RoomViewer', () => ({
 
 // The phone's session and the drawing in it, stood in: a test drives the poses the view would report.
 const walked = vi.hoisted(() => ({
-  views: [] as { hooks: { onPose?: (pose: { x: number; y: number; z: number; yaw: number }) => void; onGaveUp?: (why: 'rate' | 'lost') => void }; lineUp: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }[],
+  views: [] as { hooks: ArViewHooks; lineUp: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }[],
   sessions: [] as { stop: ReturnType<typeof vi.fn> }[],
   supported: false,
 }))
@@ -115,10 +116,11 @@ it('walks with the person, then hands the page back looking where they got to', 
   stand()
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Walk it' })) })
   expect(screen.queryByRole('button', { name: 'Walk it' })).toBeNull()
-  expect(screen.getByText(/You’re in the home/)).toBeTruthy()
-  expect(walked.views[0].lineUp).toHaveBeenCalled()
+  expect(screen.getByText(/Waiting for the phone/)).toBeTruthy()
+  expect(walked.views[0].lineUp).not.toHaveBeenCalled()
 
   act(() => walked.views[0].hooks.onPose!({ x: 0, y: 1.2, z: 0, yaw: 0 }))
+  expect(screen.getByText(/You’re in the home/)).toBeTruthy()
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Carry on from here' })) })
   expect(walked.views[0].lineUp).toHaveBeenCalledTimes(2)
 
@@ -138,4 +140,62 @@ it('says so plainly when the phone cannot carry the walk, and offers it again', 
   act(() => walked.views[0].hooks.onGaveUp!('rate'))
   expect(screen.getByRole('alert').textContent).toMatch(/couldn’t draw the home/)
   expect(screen.getByRole('button', { name: 'Walk it' })).toBeTruthy()
+})
+
+it('ignores ordinary view poses during a walk and until the reached pose is restored', async () => {
+  walked.supported = true
+  const tell = vi.fn()
+  await open({ tell })
+  ready()
+  stand()
+  const ordinary = viewer.props!.onStance!
+  tell.mockClear()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Walk it' })) })
+  expect(viewer.props!.paused).toBe(true)
+  act(() => ordinary({ x: 99, y: 99, z: 99, yaw: 1 }))
+  expect(tell).not.toHaveBeenCalled()
+  act(() => walked.views[0].hooks.onPose!({ x: 2, y: 1.6, z: -3, yaw: 0.9 }))
+  expect(tell).toHaveBeenCalledTimes(1)
+  const reached = tell.mock.calls[0][0]
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stop' })) })
+  expect(viewer.props!.paused).toBe(false)
+  act(() => ordinary({ ...reached, yaw: reached.yaw + 1 }))
+  expect(tell).toHaveBeenCalledTimes(1)
+  act(() => viewer.props!.onStance!(reached))
+  expect(tell).toHaveBeenCalledTimes(2)
+})
+
+it('shows progress and paused tracking with recenter disabled', async () => {
+  walked.supported = true
+  await open()
+  ready()
+  stand()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Walk it' })) })
+  act(() => walked.views[0].hooks.onProgress!(0.4))
+  expect(screen.getByText(/Loading the room… 40%/)).toBeTruthy()
+  act(() => walked.views[0].hooks.onPose!({ x: 2, y: 1.6, z: -3, yaw: 0.9 }))
+  act(() => walked.views[0].hooks.onProgress!(1))
+  act(() => walked.views[0].hooks.onTracking!(false))
+  expect(screen.getByText(/Tracking paused/)).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'Carry on from here' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('keeps the existing camera tools but ignores their jumps until the walk ends', async () => {
+  vi.stubGlobal('location', { search: '?tools' })
+  walked.supported = true
+  await open()
+  ready()
+  stand()
+  const initial = viewer.props!.pose
+  fireEvent.change(screen.getByLabelText('Camera'), { target: { value: '1' } })
+  const chosen = viewer.props!.pose
+  expect(chosen).not.toEqual(initial)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Walk it' })) })
+  expect((screen.getByRole('button', { name: 'Room view' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.change(screen.getByLabelText('Camera'), { target: { value: '2' } })
+  expect(viewer.props!.pose).toEqual(chosen)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stop' })) })
+  const returned = viewer.props!.pose
+  fireEvent.change(screen.getByLabelText('Camera'), { target: { value: '2' } })
+  expect(viewer.props!.pose).not.toEqual(returned)
 })

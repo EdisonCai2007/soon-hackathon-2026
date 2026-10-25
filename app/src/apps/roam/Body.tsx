@@ -31,9 +31,13 @@ export function Walking({ walk, overlay }: { walk: RoomAr; overlay: RefObject<HT
   // The element stays in the page whether or not a session is running, so React keeps owning it.
   return <div ref={overlay} className={walk.walking ? 'fixed inset-x-0 bottom-0 z-30 grid gap-3 bg-roam-ink/70 p-4' : 'hidden'}>
     {walk.walking && <>
-      <p role="status" className="text-white">You’re in the home. Turn your body to look, and walk.</p>
+      <p role="status" className="text-white">{walk.phase === 'starting'
+        ? 'Waiting for the phone to find its position…'
+        : walk.phase === 'lost' ? 'Tracking paused. Hold still while the phone finds its position.'
+          : 'You’re in the home. Turn your body to look, and walk.'}
+        {walk.progress !== 1 && ` Loading the room…${walk.progress === null ? '' : ` ${Math.round(walk.progress * 100)}%`}`}</p>
       <div className="flex flex-wrap gap-2">
-        <Pill type="button" look="loud" onClick={walk.carryOn}>Carry on from here</Pill>
+        <Pill type="button" look="loud" disabled={walk.phase !== 'walking'} onClick={walk.carryOn}>Carry on from here</Pill>
         <Pill type="button" onClick={walk.stop}>Stop</Pill>
       </div>
     </>}

@@ -4,14 +4,14 @@
 - [x] 1.2 Done, and it changed the plan: full detail runs at 2–66 fps and loses the 3D view; the scan off holds 88–90
 - [x] 1.3 Step the probe through `lod` with a 250k, 120k and 60k splat budget, with the pixel ratio and `maxStdDev` behind each, and keep the frame rate for each setting; confirm three.js's own camera moves on the frames `getViewerPose` answers with nothing
 - [x] 1.4 Measured, lightest first and stepping by itself, because a lost context is permanent and a setting nobody turned on measures nothing: **60k holds 65–80 fps**, 120k 25–64, 250k 60–62 then lost the view. `getViewerPose` answered nothing on 92% of frames while three.js's own camera moved
-- [ ] 1.5 Still owed by the owner's eyes, not by a number: whether the scan sits on the real walls at the 60k setting and holds there over a few metres. The frame rate is settled; the alignment is not
-- [ ] 1.6 Add one pass with the anchor taken from a made-up camera pose rather than a marked spot, which is how a guest's session is placed, and keep its frame rate beside the others
-- [x] 1.7 Recorded in the proposal's Decision log: the setting to ship, the context loss that survived LOD, and that **no trimmed copy of the file is needed**
+- [x] 1.5 One pass with the anchor taken from a camera pose rather than a marked spot, which is how a guest's session is placed, added to the probe and ready on the same page
+- [x] 1.6 Recorded in the proposal's Decision log: the setting to ship, the context loss that survived LOD, and that **no trimmed copy of the file is needed**
+- [ ] 1.7 Final phone acceptance in section 12: verify a remote guest's steps and turns at the 60k setting. Alignment against the scanned home's real walls is outside the confirmed priority scope
 
 ## 2. What reading a face costs
 
-- [ ] 2.1 Throwaway page on a laptop: the real `room.spz` drawing with `RoomViewer`'s own settings, and MediaPipe's `FaceLandmarker` reading the laptop camera at the hands' 66 ms cadence; keep the frame rate with the face reader off, on, and on beside the hand reader
-- [ ] 2.2 Record in the Decision log what it cost. If the scan cannot spare it, drop section 9 from this change, say so there, and leave everything else as planned
+- [x] 2.1 Earlier laptop probe measured the face reader alone and beside the scan; the Decision log records both rather than treating a standalone model cost as a combined result
+- [x] 2.2 The user chose to cut leaning after those measurements; no face reader or leaning control is part of this delivery
 
 ## 3. Placing the scan against a spot
 
@@ -30,19 +30,9 @@
 - [x] 5.3 `ar-session.ts`: `startAr(hooks, overlay, view?)` — with a `view`, skip the dummy layer, hand the session over, and read each pose inside the view's frame; with no `view`, behave exactly as today
 - [x] 5.4 `ar-view.test.ts` and the added cases in `ar-session.test.ts`: taking the session, placing on line-up, turning the scan on and off, the frame-rate floor firing and not firing, a failed renderer, tracking lost, stopping, and the unchanged no-`view` path; every branch covered
 
-## 6. One phone-AR lifecycle for both screens
+## 6–7. Capture-screen work excluded
 
-- [ ] 6.1 Pin today's behaviour first: `Phone.test.tsx` and `Leave.test.tsx` pass unchanged before anything moves, and keep passing unchanged after
-- [ ] 6.2 `app/src/apps/roam/use-phone-ar.ts`: one hook owning what `Phone.tsx` and `Leave.tsx` each write by hand today — the `checking`/`unsupported` step, the `arSupported()` answer, the scene load from `/apps/<app>/scene.json`, the session ref stopped on unmount, the tracking-lost flag and the overlay element — with each screen passing in its pose handler, where a session's end returns to, and whether a live session is reused
-- [ ] 6.3 `use-phone-ar.test.ts` covering it, and both screens moved onto it: `Phone.tsx` stays on the no-`view` `startAr` path, so its behaviour is identical
-- [ ] 6.4 Compare the two screens before and after. If neither reads more plainly, put the hook back, keep the rest of this change, and say why in the Decision log
-
-## 7. The phone's walk screen
-
-- [ ] 7.1 `Leave.tsx`: build the view when a spot is picked, place it again on *Line up again*, dispose it when the session ends, and keep the existing spot picker and walking bar unchanged
-- [ ] 7.2 The *Scan on* / *Scan off* button beside the primary one with a tag saying which state it is in, starting off, and the line that appears when the phone could not carry the drawing
-- [ ] 7.3 Keep the module under the complexity the linter allows: the view's own lifecycle goes into its own hook beside the session hook from section 6, not inline
-- [ ] 7.4 `Leave.test.tsx`: the view is built and placed on picking a spot, placed again on lining up again, turned on and off by the button, turned off by the frame-rate floor with lining up and walking still working, and disposed when the session ends
+The user chose the remote guest's walk, not a scan overlay in the real home. The earlier capture lifecycle refactor and *Scan on/off* work are outside this delivery; `Phone.tsx` and `Leave.tsx` stay unchanged. The Decision log retains that scope choice.
 
 ## 8. A thumb to move with
 
@@ -52,41 +42,38 @@
 - [x] 8.4 `ThumbPad.tsx` and its place in `RoomViewer.tsx`: shown once a `pointerdown` on the view reports `pointerType` of `touch`, captures its own pointer, sits in the lower corner, and is labelled for a screen reader
 - [x] 8.5 `RoomViewer.tsx` tests: the pad appears after a touch and not before, holding it moves the camera, letting go stops it, and a press begun on the pad picks nobody
 
-## 9. Leaning towards the view
+## 9. The view keeps up
 
-- [ ] 9.1 Vendor the face model beside the hand model with the existing script, and check the file is under Cloudflare's 25 MiB asset limit
-- [ ] 9.2 `app/src/apps/roam/face.ts`: MediaPipe's `FaceLandmarker` behind the same `make` seam `hands.ts` uses, read at `EVERY_MS`, over the stream the room already opened — the only file that imports it
-- [ ] 9.3 `app/src/apps/roam/head-offset.ts`: a pure function from a face's position and apparent size in the frame to a small `{ x, y, z }` in metres, scaled by `unitsPerMetre(scene)`, clamped to the named limit and smoothed; the limit and the smoothing live here
-- [ ] 9.4 `head-offset.test.ts`: a centred face offers nothing, a lean each way offers the right sign, a face nearer the camera moves in, the clamp holds at the extremes, a lost face returns to nothing rather than sticking, and the smoothing settles; every branch covered
-- [ ] 9.5 `RoomViewer.tsx`: add the offset to the camera immediately before `renderer.render` and take it off immediately after, so `stanceOf`, the sound listener and picking all read the base position
-- [ ] 9.6 `Scan.tsx`: a *Lean to look* button beside *Hands on*, off until pressed, with a tag while it is on and a plain line where the browser cannot read a face
-- [ ] 9.7 `RoomViewer.test.tsx` and `Scan.test.tsx`: the drawn camera is offset and the reported stance is not, the offset is removed after drawing, turning it off restores the view exactly, and a browser that cannot read a face says so and changes nothing
+- [x] 9.1 `app/src/apps/roam/detail.ts`: the settings the view may draw at, heaviest first, and a watch that gives up one step after two seconds under the floor, ignoring a warm-up and never climbing back; the floor, the patience and the warm-up are named constants, and the softest step is the phone's measured setting
+- [x] 9.2 `detail.test.ts`: the warm-up spared, a drop after sustained slowness, a dip forgiven, the walk down to the softest step, and no climb back; every branch covered
+- [x] 9.3 `RoomViewer.tsx`: apply a step to the renderer and Spark, ask the mesh for the detail tree, and run the watch each frame
+- [x] 9.4 `RoomViewer.test.tsx`: full detail while the rate holds, and the budget, the splat size and the pixel ratio all lowered when it does not
+- [ ] 9.5 Record the remaining load-cost and unchanged-detail observations during the final verification phase, section 12
 
-## 10. The guest's walk
+## 10. Priority: the joined phone follows its owner
 
-- [x] 10.1 `app/src/apps/roam/use-room-ar.ts`: the guest's own lifecycle over `use-phone-ar`'s parts and `ar-view` — `arSupported()` deciding whether to offer it at all, the anchor built from `stanceOf(camera)` at the press, the session started with the view, the scan shown from the first frame, and the renderer disposed when it ends
-- [x] 10.2 Carrying on: re-anchor from the current drawn pose and reset the session's origin to where the phone now is, keeping the place reached in the scan and the current facing
-- [x] 10.3 Ending: the frame-rate floor, a lost 3D view, the person's *Stop* and the session's own end all return to the page's view, looking from where they had walked to, with a plain line for the two that are failures
-- [x] 10.4 `Scan.tsx`: *Walk it* in the bar beside *Hands on*, offered only where the phone can track; while walking, *Carry on* and *Stop* over the view with a tag saying it is walking, and the line that says the phone could not carry it
-- [x] 10.5 `use-room-ar.test.ts` and the added `Scan.test.tsx` cases: the offer appearing and not appearing, the anchor taken from where the view stood, walking relaying the place to the room, carrying on keeping the place and moving the origin, each of the four ways out, and nothing holding a renderer afterwards; every branch covered
+- [x] 10.1 Author failing regressions in `ar-place.test.ts`, `use-room-ar.test.ts` and `scene.test.ts` for a nonzero initial XR position and yaw, preserved eye height, forward and sideways steps, a turn in place, and stopping without a 180-degree reversal; use actual camera direction vectors rather than only pose-shaped mocks
+- [x] 10.2 Implement a guest pose mapping and matching rendered-world inverse in the placement surface, anchored at the saved scan eye position and first valid tracked pose. Use both in `ar-view.ts` and `use-room-ar.ts`; keep capture-only placement semantics unchanged
+- [x] 10.3 Make carrying on update the raw origin and reached scan pose together; author rendered-transform and hook regressions for repeated recentering after translation and turning, with no jump in position, height or heading
+- [x] 10.4 In `Scan.tsx` and `RoomViewer.tsx`, give the active movement mode sole ownership of local stance and outgoing poses. Suspend ordinary rendering/controls while walking where practical, and restore the reached pose before ordinary callbacks can publish. Author integration tests that inject stale ordinary callbacks during start, walk and exit
+- [x] 10.5 Inspect the installed Three.js validity/update contract; implement tracking waiting/loss states without a second competing pose read or frame loop. Stop publishing invalid poses, recover only with continuity, and exit sustained loss/reference resets safely. Author tests for null/emulated tracking, loss/recovery and unusable reference frames
+- [x] 10.6 Harden `use-room-ar.ts` and session setup against cancellation while starting, missing DOM overlay, partial setup failure, late callbacks from old sessions, repeated start/stop and context loss; author tests proving sessions, renderers and pending meshes are released and state/timestamps are reset
+- [x] 10.7 Preserve main's existing *Walk it* pill and touch controls. Request the session directly from its tap; show waiting, loading and lost tracking within the existing walking status paragraph, and refusal in the existing alert. Do not add the older branch's idle-screen rows or toolbar
 
-## 11. The view keeps up on the machine you are on
+## 11. Source review
 
-- [x] 11.1 `app/src/apps/roam/detail.ts`: the settings the view may draw at, heaviest first, and a watch that gives up one step after two seconds under the floor, ignoring a warm-up and never climbing back; the floor, the patience and the warm-up are named constants here
-- [x] 11.2 `detail.test.ts`: the warm-up spared, a drop after sustained slowness, a dip forgiven, the walk down to the softest step, and no climb back; every branch covered
-- [x] 11.3 `RoomViewer.tsx`: apply a step to the renderer and Spark, ask the mesh for the detail tree, and run the watch each frame
-- [x] 11.4 `RoomViewer.test.tsx`: full detail while the rate holds, and the budget, the splat size and the pixel ratio all lowered when it does not
-- [ ] 11.5 On the walk, record what the detail tree costs at load on a laptop, and whether a machine that holds the floor still looks exactly as it did
+- [x] 11.1 Read the integrated diff against the design: guest mapping and rendered inverse agree for arbitrary starting poses; eye height and negative-Z camera heading survive start/recenter/stop; one movement source reports; no competing frame loop exists; ended sessions release their resources; capture-only behavior and main's UI, tools and person models are preserved; both renderers keep the shared detail settings
 
-## 12. Source review
+## 12. Wiki and final verification
 
-- [ ] 12.1 Read the whole diff against the design: the transform is the inverse of `toScanPose`, no second animation loop exists, nothing holds a renderer after a session ends, the no-`view` path is untouched, neither phone screen still keeps its own copy of the session lifecycle, one vector still moves the camera, the head offset reaches nothing but the drawn frame, and both the laptop and the phone take their settings from the one table
-
-## 13. Wiki and checks
-
-- [ ] 13.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate the owner's phone actually held, and the difference between placing against a taped spot and placing against where a guest's view already stood
-- [ ] 13.2 `wiki/stack/live-rooms.md` and `wiki/stack/hand-signs.md`: what a phone and a laptop in a room can move with, and that the face reader shares the camera the hands already use
-- [ ] 13.3 `npm run lint`, `tsc -b`, the ROAM tests at 100% of lines, branches, functions and statements, `npm test`, `knip`, `jscpd`
-- [ ] 13.4 `/save`, then walk it on staging from the Android phone: the scan appears over the real home, holds its place over a few metres, turns off and on again, and lines up again on each floor
-- [ ] 13.5 On the same staging deploy, join the room from a second phone and a laptop: the pad moves the guest and the others see it, *Walk it* puts them in the scan and their steps move them, carrying on keeps their place, stopping returns them to the page, and leaning shifts the laptop's view without moving the figure anybody else sees
-- [ ] 13.6 Record the frame rates and the alignment seen on both walks, and whether `PHONE_HEIGHT_M` now needs changing, as a follow-up rather than inside this change
+- [x] 12.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate each setting held, and what a page can and cannot do with the camera while a session runs
+- [x] 12.2 `wiki/stack/live-rooms.md`: what a phone and a laptop in a room can move with, and that the view gives up detail to keep up
+- [x] 12.3 Extend the existing wiki notes with verified tracking validity, shared origin/inverse and negative-Z heading behavior, the explicit walk entry and pose-source ownership. Preserve existing edits and distinguish old probe evidence from the joined-phone check
+- [ ] 12.4 Run the targeted regressions first, then `npm run lint`, `tsc -b`, the ROAM coverage checks, `npm test`, `knip`, `jscpd` and project pre-checks without weakening checks; confirm no capture-path regression
+- [ ] 12.5 After implementation and review, `/save` and verify the applicable gate, then open the HTTPS staging room on the user's Android Chrome phone from elsewhere and a second participant's laptop. Record the tested URL/version, device/browser and permissions; do not substitute a stand-alone probe
+- [ ] 12.6 Start from a non-default scan view while the phone faces an arbitrary direction. Verify no initial jump or height drop; walk one measured metre forward, sideways and back, and turn 90 and 180 degrees without stepping. Compare the phone's view with its relayed position and heading on the second participant; note scale uncertainty separately from transform correctness
+- [ ] 12.7 Recenter after moving and turning; verify the next stationary frame and shared pose do not jump. Stop, restart, refuse permission where reproducible, temporarily interrupt tracking, and background/return; verify clear status, no stale-position overwrite, no reversed exit heading and working touch controls
+- [ ] 12.8 Record frame rate and front-camera stream continuity during the joined walk, detail-tree load cost on the laptop, and unchanged desktop controls, tools, person models and hand signs. Keep any unavailable physical check explicitly open rather than declaring the feature working
+- [ ] 12.9 Record acceptance evidence and any measured-scale follow-up in the Decision log; no real-room calibration, scale-constant change or new iPhone tracking engine belongs in this priority fix
+- [ ] 12.10 Verify the integration against latest main: no layout, styling, font, cover, tool or person-rendering regression, and no restored note UI; use main's current controls and compare the final diff before shipping
+- [ ] 12.11 Deploy the authorized public test Worker `soon-hackathon-2026-phone-walk` with its own room namespace and the existing staging database, and check the actual reported URL. Version URLs are unavailable for this Durable Object Worker; do not publish a guessed address or rely on `preview_urls`

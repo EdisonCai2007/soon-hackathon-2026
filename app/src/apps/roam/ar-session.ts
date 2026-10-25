@@ -58,7 +58,12 @@ export async function startAr(hooks: ArHooks, overlay?: HTMLElement | null, draw
   session.addEventListener('end', () => { running = false; hooks.onEnd() })
   const stop = () => { running = false; void session.end().catch(() => {}) }
   if (drawing) {
-    await drawing.take(session)
+    try {
+      await drawing.take(session)
+    } catch (error) {
+      stop()
+      throw error
+    }
     return { stop, overlaid: !!session.domOverlayState }
   }
   await attachLayer(session)
