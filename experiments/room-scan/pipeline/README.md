@@ -89,4 +89,14 @@ A new floor trains on its own and joins the existing splats, so the scanned floo
 
 More views beat more cleanup: re-running the stairs at one frame every 0.3 s (210 frames in three Pi3X runs, stitched to the first stairs run through about 15 shared frames each) raised the stairs from 17–21 dB to 22.5–23 dB.
 
+## Replace one walk's space
+
+To rebuild one stretch from a better video, such as a hall and its stairs, without touching the rooms around it:
+
+1. Reconstruct the walk densely (one frame every 0.25 s), with each piece sharing frames with a piece already stitched, and stitch it with `extend_scan.py`.
+2. Train a model of the walk alone, adding the other videos' frames of the same space so it holds up from their angles too. A model trained on one walk looks worse from another walk's viewpoints: here the hall from IMG_1258 alone scored 25 dB on its own frames but cost the older hall video 5 dB.
+3. `region_swap.py --path <chunks:from-to:radius[:upstairs]>` takes the space as what lies near the walk's camera path and is seen by its frames, so the far side of a shared wall stays the room's. It puts the old scan's other splats first, unchanged.
+4. `finetune.py --freeze-first <kept count>` blends the seam on every video's frames while only the new splats move; the kept splats are written back byte for byte.
+5. `clear_air.py --from-index <kept count>` deletes the new splats floating at head height between the walls: walls are the floor cells where head-height splats pile up, counting every splat. It costs about 1 dB on the walk's own frames but looks cleaner off the walk. It cannot sharpen walls the video never filmed level: a phone pointed at the floor leaves eye-height walls soft.
+
 `fit_path.py` (fitting pieces to a hand-drawn floor map) and `remove_people.py` were tried and not used: a sketched map's proportions bent the hallway, and painting before training removed people better than deleting splats after.
