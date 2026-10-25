@@ -70,9 +70,9 @@ it('opens at Room view with the scan’s counts, and each view or camera moves t
   await open()
   send({ type: 'ready', scene })
   expect(screen.queryByRole('status')).toBeNull()
-  expect(screen.getByText('665 video views · 546,977 splats')).toBeTruthy()
+  expect(screen.getByText('770 video views · 595,196 splats')).toBeTruthy()
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
-  expect(camera().options).toHaveLength(665)
+  expect(camera().options).toHaveLength(770)
   expect(camera().value).toBe('0')
 
   fireEvent.click(button('Overview'))
@@ -85,6 +85,37 @@ it('opens at Room view with the scan’s counts, and each view or camera moves t
   fireEvent.click(button('Room view'))
   expect(viewer.props!.pose).toEqual(poseFor(scene, 'room'))
   expect(camera().value).toBe('0')
+})
+
+it('shows where the camera is once the room is ready, and copies it', async () => {
+  await open()
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+  act(() => viewer.props!.onWhere!({ position: [1.2344, -0.00004, -2.5], target: [1.9344, 0.1, -3.2], up: [0, 1, 0], fov: 55 }))
+  expect(screen.queryByLabelText('Camera position')).toBeNull()
+  send({ type: 'ready', scene })
+  act(() => viewer.props!.onWhere!({ position: [1.2344, -0.00004, -2.5], target: [1.9344, 0.1, -3.2], up: [0, 1, 0], fov: 55 }))
+  const line = 'x 1.234 y 0.000 z -2.500 facing 0.70 0.10 -0.70'
+  expect(screen.getByLabelText('Camera position').textContent).toBe(line)
+  await act(async () => { fireEvent.click(button('Copy')) })
+  expect(writeText).toHaveBeenCalledWith(line)
+  expect(button('Copied')).toBeTruthy()
+  // Walking on reads a new spot, which has not been copied yet.
+  act(() => viewer.props!.onWhere!({ position: [2, 0, -2.5], target: [2, 0, -3.5], up: [0, 1, 0], fov: 55 }))
+  expect(button('Copy')).toBeTruthy()
+  // A browser that refuses the clipboard copies the selected line the old way, or leaves it selected to copy by hand.
+  const execCommand = vi.fn(() => true)
+  Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true })
+  writeText.mockRejectedValueOnce(new Error('denied'))
+  await act(async () => { fireEvent.click(button('Copy')) })
+  expect(execCommand).toHaveBeenCalledWith('copy')
+  expect(getSelection()?.toString()).toBe('x 2.000 y 0.000 z -2.500 facing 0.00 0.00 -1.00')
+  expect(button('Copied')).toBeTruthy()
+  act(() => viewer.props!.onWhere!({ position: [3, 0, -2.5], target: [3, 0, -3.5], up: [0, 1, 0], fov: 55 }))
+  execCommand.mockReturnValueOnce(false)
+  vi.stubGlobal('navigator', { ...navigator, clipboard: undefined })
+  await act(async () => { fireEvent.click(button('Copy')) })
+  expect(button('Copy')).toBeTruthy()
 })
 
 it('says why the room failed and tries again', async () => {

@@ -125,6 +125,8 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
       const caster = new Raycaster()
       caster.setFromCamera(pointer, camera)
       const meshes = [...figures].map(([id, figure]) => ({ id, mesh: figure.mesh }))
+      // A figure moved since the last frame is hit where it stands now, not where it was drawn.
+      for (const { mesh } of meshes) mesh.updateMatrixWorld()
       const hit = caster.intersectObjects(meshes.map((one) => one.mesh), false)[0]
       return meshes.find((one) => one.mesh === hit?.object)?.id ?? null
     },

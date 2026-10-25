@@ -240,6 +240,16 @@ it('tells the page where this person stands, ten times a second and no more', as
   expect(onStance.mock.calls[0][0]).toMatchObject({ x: expect.any(Number), yaw: expect.any(Number) })
 })
 
+it('tells the page where the camera is and faces, on the same gate, even walking alone', async () => {
+  const onWhere = vi.fn()
+  const { draw, renderer } = await live({ onWhere })
+  draw(1000)
+  draw(1000 + SEND_INTERVAL_MS / 2)
+  const viewing = renderer.render.mock.calls[0][1] as PerspectiveCamera
+  expect(onWhere).toHaveBeenCalledTimes(1)
+  expect(onWhere.mock.calls[0][0]).toEqual(cameraPose(viewing))
+})
+
 it('watches the person a press lands on, and nobody where a press lands on the room', async () => {
   const onPick = vi.fn()
   const { draw, renderer } = await live({ peers: [peer('a1', { x: 0, y: 0, z: 0 })], onPick })

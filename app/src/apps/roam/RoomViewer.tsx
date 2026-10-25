@@ -23,6 +23,8 @@ type Props = {
   onPick?: (id: string, pose: Pose) => void
   /** Where this page's own person stands, ten times a second, for the others to draw. */
   onStance?: (stance: Stance) => void
+  /** Where the camera is and faces, ten times a second, for the page to show. */
+  onWhere?: (pose: Pose) => void
 }
 
 // Three.js r180 draws with WebGL 2 alone, so a browser without it gets a plain message, not a blank box.
@@ -36,12 +38,12 @@ async function loadScene(url: string) {
 
 /** Edison's room viewer inside the page: the renderer, Spark and the scan live for as long as this part is shown,
  *  sized to its box, and each new `pose` moves the camera. */
-export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance }: Props) {
+export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audio = null, onPick, onStance, onWhere }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
-  const latest = useRef({ peers, onPick, onStance })
-  useEffect(() => { latest.current = { peers, onPick, onStance } })
+  const latest = useRef({ peers, onPick, onStance, onWhere })
+  useEffect(() => { latest.current = { peers, onPick, onStance, onWhere } })
 
   useEffect(() => {
     if (!hasWebGL()) {
@@ -114,9 +116,10 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], audi
         previous = time
         stage.update(camera, time)
         // The others are told where this person stands on the same gate their figures are drawn on.
-        if (latest.current.onStance && dueToSend(told, time)) {
+        if (dueToSend(told, time)) {
           told = time
-          latest.current.onStance(stanceOf(camera))
+          latest.current.onStance?.(stanceOf(camera))
+          latest.current.onWhere?.(cameraPose(camera))
         }
         renderer.render(world, camera)
       })
