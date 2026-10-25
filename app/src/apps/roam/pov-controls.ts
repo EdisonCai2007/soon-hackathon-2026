@@ -9,6 +9,7 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 /** A free first-person camera: looking turns in place and never orbits a target. W/A/S/D move on the floor plane,
  *  Q/E down and up, Shift is faster, the wheel moves forward, and `push` is the same movement from the pad. */
 export class PovControls {
+  private enabled = true
   private readonly keys = new Set<string>()
   private readonly euler = new Euler(0, 0, 0, 'YXZ')
   private readonly motion = new Vector3()
@@ -27,7 +28,7 @@ export class PovControls {
     element.tabIndex = 0
     element.style.cursor = 'grab'
     const on = <E extends Event>(target: EventTarget, name: string, fn: (event: E) => void, options?: AddEventListenerOptions) => {
-      const listener = fn as EventListener
+      const listener: EventListener = (event) => { if (this.enabled) fn(event as E) }
       target.addEventListener(name, listener, options)
       this.listeners.push(() => target.removeEventListener(name, listener, options))
     }
@@ -77,6 +78,7 @@ export class PovControls {
 
   /** Takes the camera's current direction as the starting yaw and pitch, after a view jump. */
   sync() {
+    this.pointer = null
     this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ')
     this.yaw = this.euler.y
     this.pitch = clamp(this.euler.x, -PITCH_LIMIT, PITCH_LIMIT)
@@ -93,6 +95,11 @@ export class PovControls {
     this.yaw -= dx * 0.0025
     this.pitch = clamp(this.pitch - dy * 0.0025, -PITCH_LIMIT, PITCH_LIMIT)
     this.camera.quaternion.setFromEuler(this.euler.set(this.pitch, this.yaw, 0, 'YXZ'))
+  }
+
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled
+    this.sync()
   }
 
   update(dt: number) {
