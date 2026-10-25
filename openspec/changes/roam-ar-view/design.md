@@ -26,16 +26,16 @@ Constraints that carry over from [AR in the browser](../../../wiki/development/a
 - Some way for every touch screen to move through the scan, which none has today.
 - A view that keeps a usable frame rate on the machine it is actually on.
 - A guest who joined from anywhere walking the scan by walking their own floor, at life size, on a phone that can track.
-- Leaning, if a laptop can afford it: the view following the viewer's head, as a window does.
 
 **Non-Goals:**
 
 - The phone in the real home drawing anything at all. It is a camera and a position.
+- The view following the viewer's head. Measured and cut: a face read costs 33 ms with the machine to itself but 347 ms beside the splats, dropping the view to 0–6 fps, which is the headroom the frame-rate step-down exists to win back.
 - Notes, how they are left, or how they are read. `Leave.tsx` is untouched.
 - Occluding the scan behind real walls, in a guest's session or anywhere else.
 - Drawing other people's figures inside a guest's walking session. The figures are `roam-body`'s.
 - Reading a phone's orientation sensors (`DeviceOrientationEvent`). It would give every phone turn-to-look for a few lines — and it was the recommendation — but it was not chosen, and it would be a third way to aim one camera.
-- Amplifying anything: a real step is one scan metre, and a lean is a lean.
+- Amplifying anything: a real step is one scan metre.
 - Changing `PHONE_HEIGHT_M`. A guest's walk is what makes the right value visible; setting it is a one-line follow-up.
 - Any server, schema or storage change.
 
@@ -104,25 +104,13 @@ One cost, taken deliberately: the mesh now always asks for the level-of-detail t
 
 **The scan starts drawn, and failure ends the session.** There is no button to turn it off, for one reason: a guest who turned the scan off would be left looking at their own living room through their own camera, which is a view of nothing. So the scan is on from the first drawn frame, and the frame-rate floor and `webglcontextlost` both **end the session** and return them to the ordinary page view, where the pad and the drag still work.
 
-**Leaning is an offset on the drawn camera, never the camera's place.** `head-offset.ts` turns a face's position and apparent size in the frame into a small `{ x, y, z }` in metres — side to side, up and down, and nearer or further — scaled by `unitsPerMetre(scene)`, clamped to a few centimetres of scan, and smoothed so a jumpy read does not shake the view. `RoomViewer` adds it to the camera just before `renderer.render` and takes it off after, so:
-
-| Reads the camera | Sees |
-|---|---|
-| the drawn frame | the leaned position |
-| `stanceOf`, sent to the room | the base position, so no figure jitters |
-| notes, picking, the sound listener | the base position, so a lean never moves what you hear or hit |
-
-That ordering is the decision. An offset that leaked into the stance would be relayed ten times a second and every other page would wobble.
-
-**The face reader copies the hand reader exactly.** `face.ts` owns `FaceLandmarker` and nothing else, behind the same `make` seam `hands.ts` uses, so everything above it is tested with no camera: one module imports MediaPipe, read at the hands' own `EVERY_MS` cadence, over the stream the room already opened for the person's figure — no second permission and no second device, as [hand signs](../../../wiki/stack/hand-signs.md#reading-hands-is-a-camera-the-page-already-has) already establishes. The model file is vendored to our own origin by the same script that vendors the hand model. It is off until asked for, because it costs the camera and CPU, and it is measured before it is built: if a laptop cannot read a face and draw the splats at once, leaning is dropped from this change rather than shipped slow.
-
 ## UX
 
 **Who and the job.** Somebody sent the link and joined from wherever they are — a sofa, a desk, a train — on a phone or a laptop. The job: get around the home and see it, without being told to hold keys they may not have. Done looks like having been somewhere: they walked into a room and looked at a thing. The common case is a phone, because that is what a shared link gets opened on, and the phone is exactly the case that cannot move today.
 
-**The shortest flow.** Open the link → say your name → you are in the room → press the pad to walk, drag to look. On an Android phone, *Walk it* instead, and then it is your feet; *Carry on* when the real floor runs out; *Stop* to come back to the page. On a laptop, *Lean to look* if they want the view to follow their head.
+**The shortest flow.** Open the link → say your name → you are in the room → press the pad to walk, drag to look. On an Android phone, *Walk it* instead, and then it is your feet; *Carry on* when the real floor runs out; *Stop* to come back to the page.
 
-**Hierarchy.** The view fills the screen and the controls stay out of its way. The pad sits in the lower corner of the view, under a thumb, and appears on the first touch. *Walk it*, *Hands on* and *Lean to look* are the same weight as each other, in the bar that already holds *Hands on* and the camera chooser. Inside a session there is one primary — *Carry on* — with *Stop* beside it, and a line saying the scan could not be carried if that is why the session ended. Nothing new is a dialog.
+**Hierarchy.** The view fills the screen and the controls stay out of its way. The pad sits in the lower corner of the view, under a thumb, and appears on the first touch. *Walk it* sits beside *Hands on* in the bar that already holds it and the camera chooser, at the same weight. Inside a session there is one primary — *Carry on* — with *Stop* beside it, and a line saying the scan could not be carried if that is why the session ended. Nothing new is a dialog.
 
 ```screen
 <div class="card col gap phone">
@@ -151,16 +139,13 @@ The review page is [`review.html`](review.html). The *What Changes* item that sk
 - **A weak machine's view now softens without anybody asking it to** → accepted, and the comparison is not a crisp view but the stutter it replaces: the owner's laptop drew at 2 fps at its worst. A machine that holds 24 fps sees no change at all.
 - **The level-of-detail tree is now built on every machine, including those that never use it** → taken deliberately, because switching it on later means loading the file again. 4–5 seconds in a worker on the phone; unmeasured on a laptop and checked on the walk.
 - **The watch could give up detail over a stall that was not the drawing's fault**, such as a tab returning from the background → the warm-up covers the start, and two seconds of sustained slowness is a long stall; the worst case is a softer view until the page is opened again.
-- **Reading a face may cost more than the splats can spare on a laptop** → measured first, off by default, and dropped rather than shipped slow.
-- **Leaning could sicken somebody, since the view moves without them asking** → off until turned on, clamped to a few centimetres, and it follows the head rather than leading it, which is the direction that does not fight the inner ear.
 - **A phone that cannot be both a camera and a tracker breaks the person in the home, not this change** → named here because it is being measured now: if a session kills the camera stream, `Phone.tsx`'s two jobs cannot coexist and that is its own piece of work, with nothing in this change depending on the answer.
 
 ## Migration Plan
 
-Additive and reversible. No migration, no schema, no stored data, no route change, and nothing at all for the phone in the real home: `Phone.tsx` and `Leave.tsx` are untouched. In a room the keyboard and the drag keep working, the pad is added rather than replacing anything, walking and leaning are both off until pressed, and every way a walk ends returns to the ordinary view. Rolling back is reverting the branch.
+Additive and reversible. No migration, no schema, no stored data, no route change, and nothing at all for the phone in the real home: `Phone.tsx` and `Leave.tsx` are untouched. In a room the keyboard and the drag keep working, the pad is added rather than replacing anything, walking is off until pressed, and every way a walk ends returns to the ordinary view. Rolling back is reverting the branch.
 
 ## Open Questions
 
-- Whether a phone can stream its camera into the room and report where it is standing at the same time. A probe is on the owner's phone now. Nothing in this change depends on it; what the person in the real home can do does.
-- What reading a face costs on a laptop while the splats draw. Measured the same way, before the leaning is built; a cost the scan cannot spare drops the leaning and nothing else moves.
+- None outstanding. Measured and settled: a phone can stream its camera and report where it stands at once, the 60k budget holds 65–80 fps on a phone, and leaning costs more than the scan can spare.
 - Whether the scan sits on the real walls at the measured phone setting, which only the owner's eyes on a walk can answer.

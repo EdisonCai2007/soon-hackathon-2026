@@ -1,8 +1,8 @@
 # Everyone moves through the room, on the device they have
 
-**Status:** part built — the thumb pad, the frame-rate step-down and a guest's walk are done and green. The phone in the home is settled and needs nothing built. Only the laptop's leaning still waits on a measurement.
+**Status:** built — the thumb pad, the frame-rate step-down and a guest's walk are done and green; leaning is cut on its own measurement. What remains is a walk on staging and the wiki.
 **Branch:** roam-ar-view (branched from `roam-notes`, so the notes work sits underneath it)
-**Open questions:** what reading a face off the laptop's camera costs while the scan is drawing, which decides whether leaning is built or dropped.
+**Open questions:** none. What is left is a walk on staging to judge whether the scan sits on the real walls, and whether `PHONE_HEIGHT_M` needs changing after it.
 
 ## Why
 
@@ -37,22 +37,9 @@ So this change is about moving through the room, for whoever is away from it: a 
   | under 24 for two seconds | 250,000 splats, then 120,000, then 60,000 |
   | once softened | it stays there, rather than flickering between two settings |
 
-- **On a laptop, leaning shifts the view, like leaning towards a window.** Turn on *Lean to look* and the laptop's own camera watches your head: lean left and you see a little further round the left of the doorway. It is a small, calm effect that makes the room feel like a place rather than a picture — not a way to get around, so the keys and the mouse stay exactly as they are. It starts off, because it uses the camera and some of the laptop's effort.
-  ```svg
-  <svg viewBox="0 0 220 84">
-    <rect x="10" y="14" width="78" height="52" fill="card" stroke="line"/>
-    <text x="18" y="34" fill="fg">lean left</text>
-    <text x="18" y="52" fill="muted">head moves</text>
-    <path d="M96 40h26m-8-6 8 6-8 6" fill="none" stroke="fg"/>
-    <rect x="130" y="14" width="80" height="52" fill="card" stroke="line"/>
-    <text x="138" y="34" fill="fg">see round</text>
-    <text x="138" y="52" fill="muted">the doorway</text>
-  </svg>
-  ```
-
 - **The phone in the real home keeps doing exactly what it does today.** It sends its camera and where it is standing, and draws nothing. It was going to show the scanned home over the real one; that is dropped, because somebody standing in the home can already see the home. The note screen is untouched.
 
-Non-goals: the phone in the home drawing anything, turning a drawing on and off there, notes seen as markers over the real room, an iPhone walking by its own movement (its browser cannot tell where it is — it gets the thumb pad), leaning as a way to travel rather than to peer, making a step cover more ground than a step, drawing other people's figures inside a walking guest's session, scanning the home again to show what changed, and changing how notes are stored, left or read.
+Non-goals: the phone in the home drawing anything, turning a drawing on and off there, notes seen as markers over the real room, an iPhone walking by its own movement (its browser cannot tell where it is — it gets the thumb pad), the view following the viewer's head at all, measured and cut, making a step cover more ground than a step, drawing other people's figures inside a walking guest's session, scanning the home again to show what changed, and changing how notes are stored, left or read.
 
 ## Capabilities
 
@@ -70,7 +57,6 @@ Non-goals: the phone in the home drawing anything, turning a drawing on and off 
 - `RoomViewer.tsx` and that AR view both load a scan and draw splats; the shared part is one module, `splat-scene.ts`, so the laptop and the phone cannot drift apart on how the home is stood upright.
 - The room view's movement grows in `pov-controls.ts`, which gains a second source of the same movement vector the keys already produce, fed by a thumb pad drawn over the view. `Scan.tsx` gains the pad, *Walk it*, *Carry on from here* and *Stop*.
 - `detail.ts` holds the settings the view may draw at and the watch that steps down through them; `RoomViewer.tsx` applies one and a guest's session pins the measured phone setting, so one table serves both.
-- Leaning, if it is built at all, reuses the hand reader's shape exactly — one module owning MediaPipe and nothing else, over the camera the room already opened — and adds its face model to the files the app serves itself.
 - **Nothing about the phone in the home changes.** `Phone.tsx` and `Leave.tsx` are untouched, notes are left the way they are left today, and the earlier plan to grow a canvas on the note screen is dropped.
 - **No new packages.** Three.js already carries WebXR, the installed Spark already draws through `renderer.xr.getCamera()`, and MediaPipe's vision tasks are already a dependency for hands.
 - No server side, no migration, no schema change. A guest's place in the room still goes up as the same position ten times a second, whatever moved them, so nobody else's page changes at all.
@@ -126,3 +112,6 @@ Non-goals: the phone in the home drawing anything, turning a drawing on and off 
 - **2026-10-25** — Withdrawn from the specs as part of this: the requirements that said the scan is drawn over the real room, turned on and off by the person, and placed again on lining up. They were reconciled into the main specs at an earlier checkpoint and described behaviour nobody will now build, so they are gone from `roam-ar-view` and `roam-capture` rather than left as a promise.
 - **2026-10-25** — **Measured on the owner's phone, and it settles the phone in the home: it can do both at once.** With the front camera opened first and an `immersive-ar` session started over it, the camera stayed live, not muted and enabled for the whole 32-second run, sending 957 pictures, while 919 of 957 frames carried a pose and 375 showed the phone had moved. So streaming the camera and reporting where it stands do not fight each other, `Phone.tsx`'s existing order is right, and nothing about the person in the real home needs building.
 - **2026-10-25** — Found in the same run, and it sharpens the earlier warning rather than contradicting it: when the **page** owns the frame loop and attaches its own layer, only 4% of frames came back without a pose, against 92% when three.js held the session. So `getViewerPose` is reliable on the path `Phone.tsx` and `Leave.tsx` use, and the camera three.js has moved is the thing to read only inside a drawing session.
+- **2026-10-25** — **Measured on the laptop, paused pass, and it names the cause: contention, not a slow model.** A face read costs **33 ms with the machine to itself** (worst 199 ms) against **347 ms while the splats draw** (worst 6,734 ms), and the drawing fell to 0–6 fps with the reader on, against 1–60 without. The model would fit the 66 ms cadence alone; it cannot share this GPU with the scan.
+- **2026-10-25** — Named rather than glossed: the probe drew at the viewer's old full-detail settings, which is a setting nobody will run now that the view steps down to 250k, 120k or 60k splats. So face-reading beside a *stepped-down* scan is still unmeasured, and that is the only configuration leaning would live in.
+- **2026-10-25** — Asked, on those numbers → **cut the leaning.** The model fits the cadence alone, but beside the splats it costs 347 ms a read and drops the view to 0–6 fps, which is the exact headroom the frame-rate step-down was built to win back. Reading a face beside a stepped-down scan was offered as a fairer measurement and declined; the `face:` line was also never confirmed to track a leaning head, so the signal itself was unproven. The laptop keeps the keys, the mouse and a view that holds up.

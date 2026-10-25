@@ -47,6 +47,18 @@ Cloudflare [does not generate a Version URL for a Worker that implements a Durab
 
 `GET /apps/<name>/api/<route>` reaches a bare handler, and [the shared dispatcher](../../app/worker/api/contract.ts) hands a function route's response straight back, so the upgrade's 101 and its socket reach the browser untouched. Pass the request on to the object with `room.fetch(new Request(inner, request))`.
 
+## Moving about in a shared space
+
+Whoever joined from somewhere else is who the shared space exists for, so each device needs its own way to move, and they all feed one movement vector rather than each touching the camera:
+
+- **Keys and a drag** on a laptop, as ever.
+- **A pad under a thumb** on a touch screen, because the keys are unreachable there: a phone guest could otherwise look around from one spot and nothing more. It keeps its own pointer, so the press never reaches the canvas behind it.
+- **Their own feet**, where the browser can track the device: an `immersive-ar` session anchored on wherever their view already stood, at life size, with one press to re-anchor when the real floor runs out ([AR in the browser](../development/ar-in-the-browser.md#drawing-something-in-the-session)).
+
+**The view gives up detail rather than stuttering.** The same scan drew at 2–28 frames a second on one laptop and 90 on another, so no single setting is right: watch a rolling frame rate and step down through splat budgets until it holds, never climbing back within a session. A machine that keeps up draws exactly what it drew before.
+
+**Whatever moved somebody, the room hears the same thing** — one position, ten times a second — so a new way to move needs no protocol change and no other page knows the difference.
+
 ## What the browser side owns
 
 - **Exactly one side of each pair offers**, decided by comparing the two member ids, so no lock and no clash.

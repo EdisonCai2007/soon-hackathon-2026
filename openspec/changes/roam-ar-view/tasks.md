@@ -12,7 +12,7 @@
 
 - [x] 2.1 Throwaway page on a laptop: the real `room.spz` drawing with `RoomViewer`'s own settings, and MediaPipe's `FaceLandmarker` reading the laptop camera at the hands' 66 ms cadence; keep the frame rate with the face reader off, on, and on beside the hand reader
 - [x] 2.2 First pass, and it is not conclusive: a read cost **289 ms** against the 66 ms it needs, with the drawing itself at 2–28 fps. A *Pause the drawing* pass was added to the probe to separate a slow model from a starved one
-- [ ] 2.3 Run the paused pass and record what a read costs with the machine to itself. Cheap enough → build section 10; still hundreds of milliseconds → drop section 10, say so in the Decision log, and leave everything else
+- [x] 2.3 Measured: **33 ms a read paused, 347 ms while drawing**, and the drawing fell to 0–6 fps with the reader on. The model fits the cadence alone and cannot share the GPU with the scan, so leaning is not affordable as measured
 
 ## 3. Can a phone be the room's camera and its tracker at once
 
@@ -60,25 +60,15 @@
 - [x] 9.4 `RoomViewer.test.tsx`: full detail while the rate holds, and the budget, the splat size and the pixel ratio all lowered when it does not
 - [ ] 9.5 On the walk, record what the detail tree costs at load on a laptop, and whether a machine that holds the floor still looks exactly as it did
 
-## 10. Leaning towards the view
+## 10. Source review
 
-- [ ] 10.1 Only if section 2 says a laptop can spare it. Vendor the face model beside the hand model with the existing script, and check the file is under Cloudflare's 25 MiB asset limit
-- [ ] 10.2 `app/src/apps/roam/face.ts`: MediaPipe's `FaceLandmarker` behind the same `make` seam `hands.ts` uses, read at `EVERY_MS`, over the stream the room already opened — the only file that imports it
-- [ ] 10.3 `app/src/apps/roam/head-offset.ts`: a pure function from a face's place and apparent size in the frame to a small offset in metres, scaled by `unitsPerMetre(scene)`, clamped to the named limit and smoothed
-- [ ] 10.4 `head-offset.test.ts`: a centred face offers nothing, a lean each way offers the right sign, a face nearer the camera moves in, the clamp holds, a lost face returns to nothing, and the smoothing settles; every branch covered
-- [ ] 10.5 `RoomViewer.tsx`: add the offset to the camera immediately before drawing and take it off immediately after, so the stance, the sound and picking all read the base position
-- [ ] 10.6 `Scan.tsx`: a *Lean to look* button beside *Hands on*, off until pressed, with a tag while it is on and a plain line where the browser cannot read a face
-- [ ] 10.7 `RoomViewer.test.tsx` and `Scan.test.tsx`: the drawn camera is offset and the reported stance is not, the offset is removed after drawing, turning it off restores the view, and a browser that cannot read a face says so and changes nothing
+- [ ] 10.1 Read the whole diff against the design: the placing transform is the inverse of `toScanPose`, no second animation loop exists, nothing holds a renderer after a session ends, the no-drawing path in `ar-session.ts` is untouched, `Phone.tsx` and `Leave.tsx` are untouched, one vector still moves the camera, and both the laptop and the phone take their settings from the one table
 
-## 11. Source review
+## 11. Wiki and checks
 
-- [ ] 11.1 Read the whole diff against the design: the placing transform is the inverse of `toScanPose`, no second animation loop exists, nothing holds a renderer after a session ends, the no-drawing path in `ar-session.ts` is untouched, `Phone.tsx` and `Leave.tsx` are untouched, one vector still moves the camera, and both the laptop and the phone take their settings from the one table
-
-## 12. Wiki and checks
-
-- [ ] 12.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate each setting held, and what a page can and cannot do with the camera while a session runs
-- [ ] 12.2 `wiki/stack/live-rooms.md`: what a phone and a laptop in a room can move with, and that the view gives up detail to keep up
-- [ ] 12.3 `npm run lint`, `tsc -b`, the ROAM tests at 100% of lines, branches, functions and statements, `npm test`, `knip`, `jscpd`
-- [ ] 12.4 `/save`, then walk it on staging: from an Android phone joined to a room, the pad moves you and the others see it, *Walk it* puts you in the scan and your steps move you, carrying on keeps your place, and stopping returns you to the page
-- [ ] 12.5 On the same deploy, from the laptop: the room holds a steady rate without stuttering, and a note, a room and the hand signs all behave as they did
-- [ ] 12.6 Record the frame rates and the alignment seen on the walk, and whether `PHONE_HEIGHT_M` now needs changing, as a follow-up rather than inside this change
+- [x] 11.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate each setting held, and what a page can and cannot do with the camera while a session runs
+- [x] 11.2 `wiki/stack/live-rooms.md`: what a phone and a laptop in a room can move with, and that the view gives up detail to keep up
+- [ ] 11.3 `npm run lint`, `tsc -b`, the ROAM tests at 100% of lines, branches, functions and statements, `npm test`, `knip`, `jscpd`
+- [ ] 11.4 `/save`, then walk it on staging: from an Android phone joined to a room, the pad moves you and the others see it, *Walk it* puts you in the scan and your steps move you, carrying on keeps your place, and stopping returns you to the page
+- [ ] 11.5 On the same deploy, from the laptop: the room holds a steady rate without stuttering, and a note, a room and the hand signs all behave as they did
+- [ ] 11.6 Record the frame rates and the alignment seen on the walk, and whether `PHONE_HEIGHT_M` now needs changing, as a follow-up rather than inside this change

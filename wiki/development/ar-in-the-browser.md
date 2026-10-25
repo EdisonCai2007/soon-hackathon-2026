@@ -45,9 +45,12 @@ Same phone, same session, measured rather than assumed:
 | | Result |
 |---|---|
 | `getUserMedia({ audio: true })` | Granted. `MediaRecorder` gives `audio/webm;codecs=opus` at roughly 15 KB a second, so a 15-second clip is about 220 KB. |
-| `getUserMedia({ video: … })` | **Refused** — `NotReadableError: Could not start video source`. ARCore holds the camera, and it is not shared. |
+| `getUserMedia({ video: … })` **during** the session | **Refused** — `NotReadableError: Could not start video source`. ARCore holds the camera, and it is not shared. |
+| a camera opened **before** the session | **Keeps running.** Measured over 32 seconds: the track stayed `live`, unmuted and enabled, and sent 957 pictures while 919 of 957 frames carried a pose. |
 
-So a photograph taken during a session comes from `<input type="file" accept="image/*" capture="environment">`, which hands the job to the system camera. Capture the pose at the press, before the camera app opens: the session may be suspended or ended behind it, and the position is the one thing that cannot be recovered afterwards.
+**So the order is the whole trick: open the camera first, then start the session.** A phone can be a room's camera and say where it is standing at the same time — it just cannot ask for the camera once ARCore has it. A page that needs both must not tear its stream down and reopen it mid-session.
+
+A photograph taken during a session comes from `<input type="file" accept="image/*" capture="environment">`, which hands the job to the system camera. Capture the pose at the press, before the camera app opens: the session may be suspended or ended behind it, and the position is the one thing that cannot be recovered afterwards.
 
 ## Lining a phone up with a scan needs a known spot
 
@@ -55,6 +58,25 @@ A phone's tracking is relative to wherever the session started, so it has to be 
 
 - **Image tracking is not available on stable Chrome.** The WebXR image-tracking feature is [gated behind `#webxr-incubations`](https://github.com/chromium/chromium/commit/cdd4527accb10c34735b16c05b564bd4373d3855) — it works with the flag on, which is fine for a phone you own and useless for anyone else's.
 - **So mark the floor.** Tape a spot and an arrow, have the person stand there and confirm, and take that spot's position and facing from the scan's own data. Every later pose is placed against it. The accuracy is however carefully they stood, which is close enough to put a person in a room and cheap enough to repeat.
+
+## Drawing something in the session
+
+Three.js can own the session, which is the supported path and much less work than driving the frames by hand: `renderer.xr.enabled = true`, `renderer.xr.setReferenceSpaceType('local-floor')`, then `await renderer.xr.setSession(session)`, and from there `renderer.render(world, camera)` inside `renderer.setAnimationLoop`. The installed `@sparkjsdev/spark` already reads `renderer.xr.isPresenting` and draws through `renderer.xr.getCamera()`, so Gaussian splats in a session need no special handling.
+
+**The camera belongs to the phone, so move the world instead.** An XR camera is driven by the device and cannot be positioned by the page. To put a scanned place where somebody is standing, position, turn and scale the *scene* so that place lands on the session's origin — two nested groups is enough, and the maths is the exact inverse of whatever turns a tracked pose into a place in the scan.
+
+**Read the pose from the camera three.js moved, not from the frame.** Measured twice on the owner's phone: while three.js held the session, `getViewerPose` answered with nothing on **92%** of frames, yet `renderer.xr.getCamera()` had moved on the frames it ignored. On a page that owns its own frame loop and attaches its own layer, the same call is empty on only **4%** of frames. So the rule is about who owns the loop, not about the phone.
+
+**A phone cannot draw a whole scan, and a budget is the only lever that matters.** All on the same phone (Chrome 155), drawing a 546,977-splat scan:
+
+| Setting | Frames a second |
+|---|---|
+| every splat | 2–66, then the WebGL context was lost |
+| 250,000 splats | 60–62, then the context was lost |
+| 120,000 splats, ¾ of the pixels | 25–64 |
+| 60,000 splats, 0.6 of the pixels, `lodRenderScale` 4 | **65–80** — the same as drawing nothing |
+
+Spark's level-of-detail tree only applies when the mesh is built with `lod: true` *and* the renderer is given `enableLod` with an `lodSplatCount`; miss either and every splat is drawn with nothing culled, which is what 2 frames a second looks like. The tree is computed in a worker from the same file in 4–5 seconds, so a trimmed copy of the scan is not needed.
 
 ## Trying it on a real phone
 
