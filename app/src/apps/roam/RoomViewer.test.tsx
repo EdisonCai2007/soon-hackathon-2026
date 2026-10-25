@@ -286,7 +286,9 @@ it('places the voices on the sound card the page hands it', async () => {
 it('draws everything while the rate holds, and gives up detail where it cannot', async () => {
   const { draw } = await live()
   const spark = fakes.sparks[fakes.sparks.length - 1]
-  expect(spark.enableLod).toBe(false)
+  // The LOD path stays on from the first frame: the scan is a LOD tree, and nothing else draws it. No cap yet.
+  expect(spark.enableLod).toBe(true)
+  expect(spark.lodSplatCount).toBe(0)
   // Two seconds of warm-up, then two and a half at four frames a second: too slow, for long enough to matter.
   let time = 0
   for (let frame = 0; frame < 18; frame += 1) {

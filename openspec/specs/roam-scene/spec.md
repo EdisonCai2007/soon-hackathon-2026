@@ -4,7 +4,7 @@
 TBD - created by archiving change roam-scan-on-site. Update Purpose after archive.
 ## Requirements
 ### Requirement: Scan renders on the site
-The ROAM app at `/apps/roam/` SHALL load the compressed Gaussian-splat room scan from the site's own static assets, with no external CDN, and render it oriented by the scene metadata's rotation and translation.
+The ROAM app at `/apps/roam/` SHALL load the compressed Gaussian-splat room scan from the site's own static assets, with no external CDN, and render it oriented by the scene metadata's rotation and translation. It SHALL draw the scan wherever the app runs — on a developer's own computer as on the deployed site — and the path that draws it SHALL never be switched off: a machine that keeps up draws every splat through it, uncapped.
 
 #### Scenario: Open ROAM
 - **WHEN** a person opens `/apps/roam/` on a preview or the live site
@@ -13,6 +13,10 @@ The ROAM app at `/apps/roam/` SHALL load the compressed Gaussian-splat room scan
 #### Scenario: Scan cannot load
 - **WHEN** the scan or its metadata fails to load, or the browser has no WebGL
 - **THEN** the page shows a plain message and, for a failed load, a *Try again* action, instead of a blank canvas
+
+#### Scenario: Open ROAM where it is built
+- **WHEN** a person opens `/apps/roam/` on their own computer against their own server
+- **THEN** the scanned room renders there too, at full detail, rather than leaving an empty view with nothing said and nothing fetched
 
 ### Requirement: The view keeps a usable frame rate
 The viewer SHALL watch how fast it is drawing and SHALL give up detail — drawing fewer and larger splats, and filling fewer pixels — until the view is smooth enough to look at, rather than stuttering at full detail. It SHALL leave a machine that is keeping up drawing exactly what it draws today, SHALL ignore the first moments of drawing, during which the scan is still being prepared, and SHALL NOT raise the detail again within a session.
