@@ -1,6 +1,6 @@
 # Rebuild the upstairs hall and the stairs from the stairs video
 
-**Status:** in-progress
+**Status:** ready-to-ship
 **Branch:** roam-hall-stairs
 **Open questions:** none
 
@@ -65,3 +65,4 @@ None.
 - **2026-10-24** — Assumed: it goes in this change, not a new one, because a second open plan on the branch would stop publishing.
 - 2026-10-24: Cleared two clouds Edison pointed at: over the foot of the old bed, and one he gave by its copied position (x -0.395 y 0.109 z -0.400), which sits in the WC doorway. Splats within 15 cm of a solid surface, and anything near the headboard wall, were kept, because removing them opened holes. On their own held-out frames the old bedroom lost 1.5 dB and the WC 0.9 dB; walking, the clouds are gone.
 - 2026-10-24: Saved with the hall and stairs, both clean-ups and the position line together, at Edison's request to save and ship what is there.
+- 2026-10-24: Archived for shipping; the walk ran on the local build, since this site has no preview deploy.
