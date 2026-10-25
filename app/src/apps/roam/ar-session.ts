@@ -4,7 +4,7 @@ import { Euler, Quaternion } from 'three'
 import type { Pose } from './messages'
 
 type XRLike = { isSessionSupported: (mode: string) => Promise<boolean>; requestSession: (mode: string, options?: object) => Promise<XRSessionLike> }
-type XRSessionLike = {
+export type XRSessionLike = {
   requestReferenceSpace: (type: string) => Promise<object>
   requestAnimationFrame: (callback: (time: number, frame: XRFrameLike) => void) => void
   updateRenderState?: (state: object) => void | Promise<void>
@@ -17,6 +17,10 @@ type GLLike = { makeXRCompatible?: () => Promise<void> }
 
 export type ArHooks = { onPose: (pose: Pose) => void; onLost: () => void; onEnd: () => void }
 export type ArSession = { stop: () => void; overlaid: boolean }
+
+/** Something that draws into the session. Given one, `startAr` hands the session over rather than attaching a
+ *  layer nothing draws into, and the poses come from its frames: two loops on one session answers nothing. */
+export type ArDrawing = { take: (session: XRSessionLike) => Promise<void> }
 
 const xr = (): XRLike | null => (navigator as { xr?: XRLike }).xr ?? null
 
@@ -41,19 +45,24 @@ async function attachLayer(session: XRSessionLike): Promise<void> {
   await session.updateRenderState({ baseLayer: new layer(session, gl) })
 }
 
-/** Starts the session and reports where the phone is until it is stopped. An `overlay` element, where the browser
- *  allows one, keeps the page's own controls over the camera view; `overlaid` says whether it got one. */
-export async function startAr(hooks: ArHooks, overlay?: HTMLElement | null): Promise<ArSession> {
+/** Starts the session and reports where the phone is until it is stopped. An `overlay` keeps the page's own
+ *  controls over the camera view; a `drawing` takes the session over and its frames carry the poses. */
+export async function startAr(hooks: ArHooks, overlay?: HTMLElement | null, drawing?: ArDrawing): Promise<ArSession> {
   const api = xr()
   if (!api) throw new Error('This browser has no AR.')
   const session = await api.requestSession('immersive-ar', {
     requiredFeatures: ['local-floor'],
     ...(overlay ? { optionalFeatures: ['dom-overlay'], domOverlay: { root: overlay } } : {}),
   })
-  await attachLayer(session)
-  const space = await session.requestReferenceSpace('local-floor')
   let running = true
   session.addEventListener('end', () => { running = false; hooks.onEnd() })
+  const stop = () => { running = false; void session.end().catch(() => {}) }
+  if (drawing) {
+    await drawing.take(session)
+    return { stop, overlaid: !!session.domOverlayState }
+  }
+  await attachLayer(session)
+  const space = await session.requestReferenceSpace('local-floor')
   const frame = (_time: number, xrFrame: XRFrameLike) => {
     if (!running) return
     session.requestAnimationFrame(frame)
@@ -63,5 +72,5 @@ export async function startAr(hooks: ArHooks, overlay?: HTMLElement | null): Pro
     hooks.onPose({ x: position.x, y: position.y, z: position.z, yaw: facing(orientation) })
   }
   session.requestAnimationFrame(frame)
-  return { stop: () => { running = false; void session.end().catch(() => {}) }, overlaid: !!session.domOverlayState }
+  return { stop, overlaid: !!session.domOverlayState }
 }

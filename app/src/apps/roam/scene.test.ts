@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Matrix4, PerspectiveCamera, Vector3 } from 'three'
 import { expect, it } from 'vitest'
-import { applyPose, displayQuaternion, parseScene, poseFor, type Scene } from './scene'
+import { applyPose, displayQuaternion, parseScene, poseFacing, poseFor, type Scene } from './scene'
 
 // The real details shipped beside the scan, so a change to either file is checked against the other.
 const shipped: unknown = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../public/apps/roam/scene.json'), 'utf8'))
@@ -67,4 +67,15 @@ it('moves a camera to a pose', () => {
   expect(camera.position.toArray()).toEqual([0, 0, 0])
   const facing = camera.getWorldDirection(new Vector3())
   expect(facing.z).toBeCloseTo(-1, 6)
+})
+
+it('comes back to a place and a facing in the scan', () => {
+  const back = poseFacing({ x: 2, y: 1.5, z: -3, yaw: 0 })
+  expect(back.position).toEqual([2, 1.5, -3])
+  // Facing is measured the way the scan measures it, so a yaw of nothing looks along +z.
+  expect(back.target).toEqual([2, 1.5, -2])
+  expect(back.up).toEqual([0, 1, 0])
+  const turned = poseFacing({ x: 0, y: 0, z: 0, yaw: Math.PI / 2 })
+  expect(turned.target[0]).toBeCloseTo(1, 6)
+  expect(turned.target[2]).toBeCloseTo(0, 6)
 })

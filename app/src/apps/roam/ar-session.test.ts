@@ -139,6 +139,25 @@ it('asks for the page’s own controls over the camera view, and says whether it
   expect(bare.fake.asked).toHaveLength(1)
 })
 
+it('hands the session to a drawing instead of reading frames itself', async () => {
+  const pose = { transform: { position: { x: 0, y: 1, z: 0 }, orientation: orientation(0) } }
+  const { fake, makeXRCompatible } = session({ pose })
+  const listening = hooks()
+  const drawing = { take: vi.fn(async () => {}) }
+  const running = await startAr(listening, null, drawing)
+  expect(drawing.take).toHaveBeenCalledWith(fake)
+  // The drawing attaches a real layer of its own, so neither the dummy one nor a second pose reader is made.
+  expect(makeXRCompatible).not.toHaveBeenCalled()
+  expect(fake.states).toEqual([])
+  expect(fake.requestReferenceSpace).not.toHaveBeenCalled()
+  expect(running.overlaid).toBe(true)
+
+  running.stop()
+  expect(fake.end).toHaveBeenCalled()
+  fake.finish()
+  expect(listening.onEnd).toHaveBeenCalledTimes(1)
+})
+
 it('starts anyway where there is no layer to attach, so one phone’s quirk is not a dead end', async () => {
   const pose = { transform: { position: { x: 0, y: 1, z: 0 }, orientation: orientation(0) } }
   const { fake } = session({ pose, gl: false })

@@ -66,6 +66,15 @@ export function poseFor(scene: Scene, view: View): Pose {
   return { position: target.map((value, axis) => value + offset[axis]) as Vec3, target, up: [0, 1, 0], fov: FOV }
 }
 
+/** A place and a facing in the scan, as a view jump: how somebody comes back to the page looking where they
+ *  had walked to. The facing is the scan's own, measured the way `anchorAt` measures it. */
+export const poseFacing = ({ x, y, z, yaw }: { x: number; y: number; z: number; yaw: number }): Pose => ({
+  position: [x, y, z],
+  target: [x + Math.sin(yaw), y, z + Math.cos(yaw)],
+  up: [0, 1, 0],
+  fov: FOV,
+})
+
 /** Where the camera stands right now, in the same shape a view jump uses, so it can be returned to. */
 export function cameraPose(camera: PerspectiveCamera): Pose {
   const forward = camera.getWorldDirection(new Vector3()).add(camera.position)

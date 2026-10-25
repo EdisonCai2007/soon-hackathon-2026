@@ -114,8 +114,9 @@ it('gives a plain message on a browser without 3D', async () => {
 it('walks the scan alone, with nobody in it and no room in the address', async () => {
   await open()
   send({ type: 'ready', scene })
-  // Nobody to draw or hear, and nothing to tell: a press still lands, because a note left here can be opened alone.
-  expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onStance: undefined, onPick: expect.any(Function) })
+  // Nobody to draw or hear, and nobody to tell: where the walker stands is still kept, because walking the scan
+  // with your own body starts from it, and a press still lands, because a note left here can be opened alone.
+  expect(viewer.props).toMatchObject({ peers: undefined, audio: undefined, onStance: expect.any(Function), onPick: expect.any(Function) })
   expect(screen.queryByText('sound off')).toBeNull()
   expect(button('Start a room')).toBeTruthy()
 })

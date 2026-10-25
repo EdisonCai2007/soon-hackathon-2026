@@ -80,7 +80,20 @@ Spark already has the machinery — a level-of-detail tree with a target splat c
 | `renderer.setPixelRatio` | splat drawing is fill-rate bound, so fewer pixels is close to a linear saving |
 | `maxStdDev` on the renderer | how far out each Gaussian is drawn; lower trades a little softness for a lot of fill rate |
 
-Which combination ships is measured, not chosen here: the probe steps through four settings and keeps the frame rate for each. The laptop keeps today's full-detail path, because it holds 90 frames a second already.
+Which combination ships is measured, not chosen here: the probe steps through four settings and keeps the frame rate for each. Measured on the owner's phone, a 60,000-splat budget at 0.6 pixel ratio and `lodRenderScale` 4 holds 65–80 fps, the same as drawing nothing, so that is the phone's setting and the file ships as it is.
+
+**The laptop does not keep full detail either, and it is not given a constant.** The line that used to sit here — that the laptop holds 90 frames a second — was measured on a different machine. On the owner's own laptop the same scan at the same settings draws at **2 to 28 fps**. Three known machines differ by about forty times, so any constant is wrong for two of them, and the room viewer therefore finds its own setting:
+
+| | |
+|---|---|
+| `detail.ts` | the settings, heaviest first: everything, then 250k, 120k and 60k splats, each with its own `lodRenderScale`, pixel ratio and `maxStdDev` |
+| the watch | a rolling frame rate per second; two seconds under 24 fps gives up one step |
+| warm-up | the first two seconds are the upload and the first sort, and are never counted |
+| one way | it never climbs back, because a view flickering between two settings is worse to look at than a softer one that holds |
+
+The top step is Spark's own defaults (`maxStdDev` of `Math.sqrt(8)`, `lodRenderScale` of 1), so a machine that holds the floor draws exactly what it drew before. The phone's AR view reads the same table rather than keeping its own numbers, pinned to the measured step instead of watching for one — on a phone there is no spare frame to discover it with.
+
+One cost, taken deliberately: the mesh now always asks for the level-of-detail tree, because turning it on later would mean loading the 11 MB file again. That cost 4–5 seconds in a worker on the phone and is unmeasured on a laptop.
 
 **A trimmed copy of the file is the fallback, not the first move.** If the budget alone cannot hold a usable rate, a second smaller `.spz` is generated for phones — one build step and one public file. It is second because it costs a pipeline step and a file to keep in step with the scan, where the budget costs one constructor option.
 
@@ -161,6 +174,9 @@ The review page is [`review.html`](review.html). The *What Changes* items that s
 - **Leaning could sicken somebody, since the view moves without them asking** → it is off until turned on, it is clamped to a few centimetres, and it follows the head rather than leading it, which is the direction that does not fight the inner ear. Turning it off is the same press that turned it on.
 - **The pad could swallow a press meant for a person or a note** → the pad owns its own pointer through `setPointerCapture`, so the canvas never sees that press at all; the test for it is a press starting on the pad and ending over a figure, which must pick nobody.
 - **A phone's tracking reports the real floor, so a guest walking a flat room stays at one height in a scan with stairs** → that is correct and worth naming: the stairs are climbed by the pad or the camera chooser, not by walking at home.
+- **A weak machine's view now softens without anybody asking it to** → accepted, and the comparison is not a crisp view, it is the stutter the softening replaces: the owner's laptop drew at 2 fps at its worst. The floor and the steps are constants in one module, and a machine that holds 24 fps sees no change at all.
+- **The level-of-detail tree is now built on every machine, including those that never use it** → taken deliberately, because switching it on later means loading the file again. 4–5 seconds in a worker on the phone; unmeasured on a laptop and checked on the walk. If it proves slow there, the mesh asks for it only where the watch has already stepped down once, at the price of one reload.
+- **The watch could give up detail over a stall that was not the drawing's fault**, such as a tab coming back from the background → the warm-up covers the start, and two seconds of sustained slowness is a long stall; the worst case is a softer view until the page is opened again, where a stutter would have been the alternative.
 
 ## Migration Plan
 

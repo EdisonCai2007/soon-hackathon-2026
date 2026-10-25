@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState, type ComponentProps, type ReactNode, type RefObject } from 'react'
 import { Loading } from '@/components/Loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { playNote, type NoteVoice } from './note-sound'
 import type { Peer } from './presence'
 import { RoomViewer } from './RoomViewer'
 import type { Pose, Scene, View } from './scene'
+import { useRoomAr, type RoomAr } from './use-room-ar'
 import { initialViewer, viewerReducer, type ViewerEvent, type ViewerState } from './viewer-state'
 import { Watch } from './Watch'
 
@@ -65,13 +66,22 @@ const fill = (box: HTMLElement | null) => {
 type Ready = Extract<ViewerState, { status: 'ready' }> | null
 type Act = (event: ViewerEvent) => void
 
-function Bar({ ready, live, act, box, notes }: { ready: Ready; live?: Live; act: Act; box: HTMLElement | null; notes: readonly Note[] }) {
+/** Walking the scan with your own feet, where the phone can follow them. */
+function Walk({ walk, stance }: { walk: RoomAr; stance: Stance | null }) {
+  if (!walk.offered || walk.walking) return null
+  return <Button type="button" variant="outline" disabled={!stance}
+    onClick={() => stance && walk.start(stance)}>Walk it</Button>
+}
+
+function Bar({ ready, live, act, box, notes, walk, stance }:
+{ ready: Ready; live?: Live; act: Act; box: HTMLElement | null; notes: readonly Note[]; walk: RoomAr; stance: Stance | null }) {
   return <div className="mb-4 flex flex-wrap items-center gap-3">
     <h1>ROAM</h1>
     {ready && <Badge variant="secondary">{ready.scene.views} video views · {ready.scene.splats.toLocaleString('en-US')} splats</Badge>}
     <NoteCount notes={notes} />
     {live?.soundBlocked && <Badge variant="outline">sound off</Badge>}
     {live && <Hands casting={live.casting} />}
+    <Walk walk={walk} stance={stance} />
     <div className="ml-auto flex flex-wrap gap-2">
       {VIEWS.map(([view, label]) => (
         <Button key={label} type="button" variant="outline" disabled={!ready} onClick={() => act({ type: 'go', view })}>{label}</Button>
@@ -125,16 +135,31 @@ type ViewProps = {
   notes: readonly Note[]
   voice: NoteVoice | null
   onPick: NonNullable<ComponentProps<typeof RoomViewer>['onPick']>
+  stance: Stance | null
+  onStance: (stance: Stance) => void
 }
 
 /** The scan itself, with the techniques running over it and where this person's own view stands. */
-function View({ app, live, scene, pose, act, notes, voice, onPick }: ViewProps) {
-  const [stance, setStance] = useState<Stance | null>(null)
+function View({ app, live, scene, pose, act, notes, voice, onPick, stance, onStance }: ViewProps) {
   const casts = useCasts(live?.peers, live?.casting.mine, stance)
   useTechniqueSounds(live?.audio, casts, scene, stance)
   return <RoomViewer sceneUrl={`/apps/${app}/scene.json`} splatUrl={`/apps/${app}/room.spz`} pose={pose} onEvent={act}
     peers={live?.peers} notes={notes} audio={live?.audio} voice={voice} casts={casts} onPick={onPick}
-    onStance={live && ((here) => { setStance(here); live.tell(here) })} />
+    onStance={onStance} />
+}
+
+/** While the walk runs, the session owns the screen, so these are the page's only visible controls. */
+function Walking({ walk, overlay }: { walk: RoomAr; overlay: RefObject<HTMLDivElement | null> }) {
+  // The element stays in the page whether or not a session is running, so React keeps owning it.
+  return <div ref={overlay} className={walk.walking ? 'fixed inset-x-0 bottom-0 z-30 grid gap-3 bg-black/70 p-4' : 'hidden'}>
+    {walk.walking && <>
+      <p role="status" className="text-white">You’re in the home. Turn your body to look, and walk.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" onClick={walk.carryOn}>Carry on from here</Button>
+        <Button type="button" variant="outline" onClick={walk.stop}>Stop</Button>
+      </div>
+    </>}
+  </div>
 }
 
 /** The scanned room in the page: walked alone, or shared with whoever a live room holds. */
@@ -144,10 +169,19 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
   const [watching, setWatching] = useState<{ id: string; saved: Pose } | null>(null)
   const [notes, setNotes] = useState<readonly Note[]>([])
   const [opened, setOpened] = useState<string | null>(null)
+  const [stance, setStance] = useState<Stance | null>(null)
   const ready = state.status === 'ready' ? state : null
   const watched = live?.peers.find((peer) => peer.member.id === watching?.id) ?? null
   const note = notes.find((one) => one.id === opened) ?? null
-  const { voice, play, stop } = useNoteVoice(app, ready?.scene ?? null)
+  const scene = ready?.scene ?? null
+  const { voice, play, stop } = useNoteVoice(app, scene)
+  const overlay = useRef<HTMLDivElement>(null)
+  const tell = live?.tell
+  const walk = useRoomAr(`/apps/${app}/room.spz`, scene, {
+    onStance: tell,
+    onLeft: useCallback((pose: Pose) => dispatch({ type: 'look', pose }), []),
+    overlay,
+  })
 
   const refresh = useCallback(() => readNotes(app).then(setNotes), [app])
   useEffect(() => { void refresh() }, [refresh])
@@ -164,14 +198,16 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
 
   return (
     <div onPointerDown={live?.unlock}>
-      <Bar ready={ready} live={live} act={dispatch} box={box} notes={notes} />
+      <Bar ready={ready} live={live} act={dispatch} box={box} notes={notes} walk={walk} stance={stance} />
       {before}
+      {walk.trouble && <p role="alert" className="mb-3 text-sm text-muted-foreground">{walk.trouble}</p>}
       <Cameras ready={ready} act={dispatch} />
       {state.status === 'error' || state.status === 'no-webgl'
         ? <Stopped state={state} retry={() => dispatch({ type: 'retry' })} />
         : <div ref={setBox} className="relative h-[70vh] min-h-80 overflow-hidden rounded-xl border bg-[#10151c]">
-          <View app={app} live={live} scene={ready?.scene ?? null} pose={ready?.pose ?? null} act={dispatch} notes={notes}
-            voice={voice}
+          <View app={app} live={live} scene={scene} pose={ready?.pose ?? null} act={dispatch} notes={notes}
+            voice={voice} stance={stance}
+            onStance={(here) => { setStance(here); tell?.(here) }}
             onPick={(picked, saved) => {
               if (picked.kind === 'note') return setOpened(picked.id)
               if (live) setWatching({ id: picked.id, saved })
@@ -187,6 +223,7 @@ export function Scan({ app, live, before }: { app: string; live?: Live; before?:
           }} />}
         </div>}
       {live && <div className="mt-4">{live.people}</div>}
+      <Walking walk={walk} overlay={overlay} />
     </div>
   )
 }

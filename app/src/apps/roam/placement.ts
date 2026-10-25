@@ -60,6 +60,16 @@ export function toScanPose(ar: Pose, anchor: Anchor, scene: Scene): Pose {
   }
 }
 
+/** The same movement measured from a new starting point: where the phone stood then becomes the origin, and
+ *  what it has done since is expressed in the direction it was facing. How carrying on walking keeps its place. */
+export function fromOrigin(pose: Pose, origin: Pose): Pose {
+  const across = pose.x - origin.x
+  const along = pose.z - origin.z
+  const cos = Math.cos(origin.yaw)
+  const sin = Math.sin(origin.yaw)
+  return { x: across * cos - along * sin, y: pose.y - origin.y, z: across * sin + along * cos, yaw: pose.yaw - origin.yaw }
+}
+
 /** A guest's figure stands where their own view stands, with both feet on the floor under it. */
 export const standing = (pose: Pose, scene: Scene): Pose => ({ ...pose, y: floorHeight(scene, pose.y) })
 

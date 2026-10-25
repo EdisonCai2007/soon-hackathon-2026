@@ -1,11 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { PerspectiveCamera, Scene as World, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
-import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark'
+import { SparkRenderer, type SplatMesh } from '@sparkjsdev/spark'
 import { makeCastStage, type Cast, type CastStage } from './casting-stage'
+import { STEPS, watchDetail, type Detail } from './detail'
 import { PovControls } from './pov-controls'
-import { applyPose, cameraPose, displayQuaternion, loadScene, type Pose } from './scene'
+import { applyPose, cameraPose, loadScene, type Pose } from './scene'
+import { loadSplats } from './splat-scene'
 import { dueToSend } from './pose-feed'
 import { makeStage, pointerAt, stanceOf, type Picked, type Stage } from './stage'
+import { ThumbPad } from './ThumbPad'
+import { STILL, type Push } from './thumb-pad'
 import type { Peer } from './presence'
 import type { Pose as Stance } from './messages'
 import type { Note } from './notes'
@@ -44,6 +48,9 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
   const host = useRef<HTMLDivElement>(null)
   const wash = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
+  // A phone has no movement keys, so the pad appears the moment the view is touched and not before.
+  const [touched, setTouched] = useState(false)
+  const push = useRef<Push>(STILL)
   // The room changes every tenth of a second; reading it through a ref keeps the renderer from being rebuilt.
   const latest = useRef({ peers, notes, onPick, voice, onStance, casts })
   useEffect(() => { latest.current = { peers, notes, onPick, voice, onStance, casts } })
@@ -60,7 +67,6 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       if (!stopped) onEvent({ type: 'error', message })
     }
     const renderer = new WebGLRenderer({ antialias: false, powerPreference: 'high-performance' })
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
     renderer.setClearColor('#10151c')
     renderer.outputColorSpace = SRGBColorSpace
     box.appendChild(renderer.domElement)
@@ -76,7 +82,17 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
     }
-    resize()
+    // Spark's own tree does the culling, so the page only says how much to draw and lets it pick which splats.
+    const detailed = (detail: Detail) => {
+      spark.maxStdDev = detail.stdDev
+      spark.enableLod = detail.lod
+      spark.lodRenderScale = detail.renderScale
+      if (detail.splats) spark.lodSplatCount = detail.splats
+      spark.lodDirty = true
+      renderer.setPixelRatio(Math.min(devicePixelRatio, detail.pixels))
+      resize()
+    }
+    detailed(STEPS[0])
     const observer = new ResizeObserver(resize)
     observer.observe(box)
     const lost = (event: Event) => {
@@ -100,14 +116,14 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
     void (async () => {
       const scene = await loadScene(sceneUrl)
       if (stopped) return
-      splats = new SplatMesh({
+      splats = loadSplats(scene, {
         url: splatUrl,
+        // The tree is built whether or not it is used, because turning it on later would mean loading again.
+        lod: true,
         onProgress: ({ loaded, total }) => {
           if (total && !stopped) onEvent({ type: 'progress', progress: loaded / total })
         },
       })
-      splats.quaternion.copy(displayQuaternion(scene))
-      splats.position.fromArray(scene.translation)
       world.add(splats)
       await splats.initialized
       if (stopped) return
@@ -117,7 +133,10 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
       stage.show(latest.current.notes)
       let previous: number | null = null
       let told: number | null = null
+      const watch = watchDetail(detailed)
       renderer.setAnimationLoop((time) => {
+        watch.frame(time)
+        controls.push(push.current)
         controls.update(previous === null ? 0 : (time - previous) / 1000)
         previous = time
         stage.update(camera, time)
@@ -168,7 +187,12 @@ export function RoomViewer({ sceneUrl, splatUrl, pose, onEvent, peers = [], note
   // What is left here changes when somebody leaves or takes back a note; the markers follow.
   useEffect(() => { viewer.current?.stage?.show(notes) }, [notes])
 
-  return <div ref={host} className="absolute inset-0">
+  const touch = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') setTouched(true)
+  }
+
+  return <div ref={host} className="absolute inset-0" onPointerDown={touch}>
     <div ref={wash} className="pointer-events-none absolute inset-0 z-10 bg-white opacity-0" aria-hidden="true" />
+    {touched && <ThumbPad onPush={(moved) => { push.current = moved }} />}
   </div>
 }

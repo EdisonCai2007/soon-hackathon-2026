@@ -1,3 +1,20 @@
+## ADDED Requirements
+
+### Requirement: The view keeps a usable frame rate
+The viewer SHALL watch how fast it is drawing and SHALL give up detail — drawing fewer and larger splats, and filling fewer pixels — until the view is smooth enough to look at, rather than stuttering at full detail. It SHALL leave a machine that is keeping up drawing exactly what it draws today, SHALL ignore the first moments of drawing, during which the scan is still being prepared, and SHALL NOT raise the detail again within a session.
+
+#### Scenario: A machine that keeps up
+- **WHEN** the view holds a smooth frame rate at full detail
+- **THEN** every splat is drawn, as it is today, and nothing about the view changes
+
+#### Scenario: A machine that cannot
+- **WHEN** the view stays too slow to look at for a few seconds
+- **THEN** less of the scan is drawn until it is smooth again, with no question asked of the person and nothing said on screen
+
+#### Scenario: A moment of slowness
+- **WHEN** the view is slow only while the scan is first being prepared, or for a moment
+- **THEN** the detail is left alone
+
 ## MODIFIED Requirements
 
 ### Requirement: First-person movement
