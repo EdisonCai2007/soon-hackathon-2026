@@ -3,6 +3,7 @@
 import { Euler, Mesh, MeshBasicMaterial, PlaneGeometry, Raycaster, VideoTexture, type Object3D, type PerspectiveCamera, type Vector2 } from 'three'
 import { gainFor, listenerFrom, rangeFor, type Range } from './audio'
 import type { Pose } from './messages'
+import type { Note, NoteKind } from './notes'
 import { playNow } from './play'
 import { billboardYaw, figureSize, standing } from './placement'
 import { poseAt } from './pose-feed'
@@ -12,12 +13,19 @@ import type { Scene } from './scene'
 type Voice = { gain: GainNode; panner: PannerNode }
 type Figure = { mesh: Mesh; material: MeshBasicMaterial; video: HTMLVideoElement | null; texture: VideoTexture | null; voice: Voice | null; pose: Pose }
 
+/** What a press in the view landed on: somebody in the room, or something left in the place. */
+export type Picked = { kind: 'peer' | 'note'; id: string }
+
 export type Stage = {
   sync: (peers: readonly Peer[]) => void
+  show: (notes: readonly Note[]) => void
   update: (camera: PerspectiveCamera, now: number) => void
-  pick: (pointer: Vector2, camera: PerspectiveCamera) => string | null
+  pick: (pointer: Vector2, camera: PerspectiveCamera) => Picked | null
   dispose: () => void
 }
+
+// A marker's colour says which kind of note it is, beside the shape everyone's figure already has.
+const MARKED: Record<NoteKind, string> = { text: '#ffd166', voice: '#4fb8ff', photo: '#8bd450' }
 
 // A voice does not jump to its new loudness, or walking fast would click.
 const SMOOTH_S = 0.08
@@ -66,8 +74,10 @@ function listen(context: AudioContext, camera: PerspectiveCamera) {
 export function makeStage(world: Object3D, scene: Scene, context: AudioContext | null): Stage {
   const { height, width } = figureSize(scene)
   const geometry = new PlaneGeometry(width, height)
+  const marker = new PlaneGeometry(height * 0.2, height * 0.2)
   const range = rangeFor(scene)
   const figures = new Map<string, Figure>()
+  const markers = new Map<string, Mesh>()
   // Who is drawn, paired with what draws them, so the frame loop never looks anybody up.
   let drawn: { peer: Peer; figure: Figure }[] = []
 
@@ -87,6 +97,20 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
     figure.material.color.set('#ffffff')
     figure.material.needsUpdate = true
     if (context) figure.voice = voiceFor(context, stream)
+  }
+
+  const mark = (note: Note): Mesh => {
+    const mesh = new Mesh(marker, new MeshBasicMaterial({ color: MARKED[note.kind] }))
+    mesh.position.set(note.spot.x, note.spot.y, note.spot.z)
+    world.add(mesh)
+    markers.set(note.id, mesh)
+    return mesh
+  }
+
+  const unmark = (id: string, mesh: Mesh) => {
+    world.remove(mesh)
+    ;(mesh.material as MeshBasicMaterial).dispose()
+    markers.delete(id)
   }
 
   const remove = (id: string, figure: Figure) => {
@@ -110,6 +134,12 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
       })
     },
 
+    show(notes) {
+      const here = new Set(notes.map((note) => note.id))
+      for (const [id, mesh] of [...markers]) if (!here.has(id)) unmark(id, mesh)
+      for (const note of notes) if (!markers.has(note.id)) mark(note)
+    },
+
     update(camera, now) {
       for (const { peer, figure } of drawn) {
         if (peer.motion) figure.pose = poseAt(peer.motion, now)
@@ -118,20 +148,30 @@ export function makeStage(world: Object3D, scene: Scene, context: AudioContext |
         figure.mesh.rotation.set(0, billboardYaw({ x, z }, camera.position), 0)
         if (context && figure.voice) hear(figure.voice, figure.mesh.position, camera.position.distanceTo(figure.mesh.position), range, context)
       }
+      // A marker stays where it was left and turns to face whoever is looking, as a figure does.
+      for (const mesh of markers.values()) {
+        mesh.rotation.set(0, billboardYaw({ x: mesh.position.x, z: mesh.position.z }, camera.position), 0)
+      }
       if (context) listen(context, camera)
     },
 
     pick(pointer, camera) {
       const caster = new Raycaster()
       caster.setFromCamera(pointer, camera)
-      const meshes = [...figures].map(([id, figure]) => ({ id, mesh: figure.mesh }))
+      const meshes = [...[...figures].map(([id, figure]) => ({ kind: 'peer' as const, id, mesh: figure.mesh })),
+        ...[...markers].map(([id, mesh]) => ({ kind: 'note' as const, id, mesh }))]
+      // A press can land between frames, and a raycast reads the world matrix the last frame left behind.
+      for (const one of meshes) one.mesh.updateWorldMatrix(true, false)
       const hit = caster.intersectObjects(meshes.map((one) => one.mesh), false)[0]
-      return meshes.find((one) => one.mesh === hit?.object)?.id ?? null
+      const found = meshes.find((one) => one.mesh === hit?.object)
+      return found ? { kind: found.kind, id: found.id } : null
     },
 
     dispose() {
       for (const [id, figure] of [...figures]) remove(id, figure)
+      for (const [id, mesh] of [...markers]) unmark(id, mesh)
       geometry.dispose()
+      marker.dispose()
     },
   }
 }
