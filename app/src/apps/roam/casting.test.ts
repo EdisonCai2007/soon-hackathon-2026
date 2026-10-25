@@ -93,10 +93,12 @@ it('places everybody else’s cast where they are, and this page’s own where i
   expect(castsNow([], { technique: 'domain', at: 5 }, null, 1000)).toEqual([])
 })
 
+type CastProps = { peers: Peer[]; mine: Casting['mine'] }
+
 it('rebuilds the list when somebody starts casting, not every time they move', () => {
   const still = peer('a1', null)
-  const view = renderHook(({ peers, mine }: { peers: Peer[]; mine: Casting['mine'] }) => useCasts(peers, mine, WHERE),
-    { initialProps: { peers: [still], mine: null } })
+  const first: CastProps = { peers: [still], mine: null }
+  const view = renderHook(({ peers, mine }: CastProps) => useCasts(peers, mine, WHERE), { initialProps: first })
   expect(view.result.current).toEqual([])
 
   view.rerender({ peers: [peer('a1', { technique: 'blue', at: 300 })], mine: null })
