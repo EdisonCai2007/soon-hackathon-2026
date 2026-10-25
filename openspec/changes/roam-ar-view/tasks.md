@@ -6,7 +6,7 @@
 - [x] 1.4 Measured, lightest first and stepping by itself, because a lost context is permanent and a setting nobody turned on measures nothing: **60k holds 65–80 fps**, 120k 25–64, 250k 60–62 then lost the view. `getViewerPose` answered nothing on 92% of frames while three.js's own camera moved
 - [x] 1.5 One pass with the anchor taken from a camera pose rather than a marked spot, which is how a guest's session is placed, added to the probe and ready on the same page
 - [x] 1.6 Recorded in the proposal's Decision log: the setting to ship, the context loss that survived LOD, and that **no trimmed copy of the file is needed**
-- [ ] 1.7 Still owed by the owner's eyes, not by a number: whether the scan sits on the real walls at the 60k setting and holds there over a few metres, judged on a walk
+- [ ] 1.7 Final phone acceptance in section 12: verify a remote guest's steps and turns at the 60k setting. Alignment against the scanned home's real walls is outside the confirmed priority scope
 
 ## 2. What reading a face costs
 
@@ -58,17 +58,30 @@
 - [x] 9.2 `detail.test.ts`: the warm-up spared, a drop after sustained slowness, a dip forgiven, the walk down to the softest step, and no climb back; every branch covered
 - [x] 9.3 `RoomViewer.tsx`: apply a step to the renderer and Spark, ask the mesh for the detail tree, and run the watch each frame
 - [x] 9.4 `RoomViewer.test.tsx`: full detail while the rate holds, and the budget, the splat size and the pixel ratio all lowered when it does not
-- [ ] 9.5 On the walk, record what the detail tree costs at load on a laptop, and whether a machine that holds the floor still looks exactly as it did
+- [ ] 9.5 Record the remaining load-cost and unchanged-detail observations during the final verification phase, section 12
 
-## 10. Source review
+## 10. Priority: the joined phone follows its owner
 
-- [ ] 10.1 Read the whole diff against the design: the placing transform is the inverse of `toScanPose`, no second animation loop exists, nothing holds a renderer after a session ends, the no-drawing path in `ar-session.ts` is untouched, `Phone.tsx` and `Leave.tsx` are untouched, one vector still moves the camera, and both the laptop and the phone take their settings from the one table
+- [x] 10.1 Author failing regressions in `ar-place.test.ts`, `use-room-ar.test.ts` and `scene.test.ts` for a nonzero initial XR position and yaw, preserved eye height, forward and sideways steps, a turn in place, and stopping without a 180-degree reversal; use actual camera direction vectors rather than only pose-shaped mocks
+- [x] 10.2 Implement a guest pose mapping and matching rendered-world inverse in the placement surface, anchored at the saved scan eye position and first valid tracked pose. Use both in `ar-view.ts` and `use-room-ar.ts`; keep capture-only placement semantics unchanged
+- [x] 10.3 Make carrying on update the raw origin and reached scan pose together; author rendered-transform and hook regressions for repeated recentering after translation and turning, with no jump in position, height or heading
+- [x] 10.4 In `Scan.tsx` and `RoomViewer.tsx`, give the active movement mode sole ownership of local stance and outgoing poses. Suspend ordinary rendering/controls while walking where practical, and restore the reached pose before ordinary callbacks can publish. Author integration tests that inject stale ordinary callbacks during start, walk and exit
+- [x] 10.5 Inspect the installed Three.js validity/update contract; implement tracking waiting/loss states without a second competing pose read or frame loop. Stop publishing invalid poses, recover only with continuity, and exit sustained loss/reference resets safely. Author tests for null/emulated tracking, loss/recovery and unusable reference frames
+- [x] 10.6 Harden `use-room-ar.ts` and session setup against cancellation while starting, missing DOM overlay, partial setup failure, late callbacks from old sessions, repeated start/stop and context loss; author tests proving sessions, renderers and pending meshes are released and state/timestamps are reset
+- [x] 10.7 In `Scan.tsx`, promote the ready phone's explicit *Walk it* action, explain steps and turns, keep touch controls as the alternative, and show checking/loading/waiting/unsupported/refused/lost states. Wire progress where loading remains and request the session directly from the tap. Author component tests for each state and an unchanged desktop entry
 
-## 11. Wiki and checks
+## 11. Source review
 
-- [x] 11.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate each setting held, and what a page can and cannot do with the camera while a session runs
-- [x] 11.2 `wiki/stack/live-rooms.md`: what a phone and a laptop in a room can move with, and that the view gives up detail to keep up
-- [ ] 11.3 `npm run lint`, `tsc -b`, the ROAM tests at 100% of lines, branches, functions and statements, `npm test`, `knip`, `jscpd`
-- [ ] 11.4 `/save`, then walk it on staging: from an Android phone joined to a room, the pad moves you and the others see it, *Walk it* puts you in the scan and your steps move you, carrying on keeps your place, and stopping returns you to the page
-- [ ] 11.5 On the same deploy, from the laptop: the room holds a steady rate without stuttering, and a note, a room and the hand signs all behave as they did
-- [ ] 11.6 Record the frame rates and the alignment seen on the walk, and whether `PHONE_HEIGHT_M` now needs changing, as a follow-up rather than inside this change
+- [x] 11.1 Read the whole diff against the design: guest mapping and rendered inverse agree for arbitrary starting poses; eye height and negative-Z camera heading survive start/recenter/stop; one movement source reports; no competing frame loop exists; ended sessions release their resources; capture-only behavior, existing notes and unrelated edits are preserved; both renderers keep the shared detail settings
+
+## 12. Wiki and final verification
+
+- [x] 12.1 `wiki/development/ar-in-the-browser.md`: a section on drawing in a session — handing it to `renderer.xr`, the camera belonging to the phone so the world moves instead, the frame rate each setting held, and what a page can and cannot do with the camera while a session runs
+- [x] 12.2 `wiki/stack/live-rooms.md`: what a phone and a laptop in a room can move with, and that the view gives up detail to keep up
+- [x] 12.3 Extend the existing wiki notes with verified tracking validity, shared origin/inverse and negative-Z heading behavior, the explicit walk entry and pose-source ownership. Preserve existing edits and distinguish old probe evidence from the joined-phone check
+- [ ] 12.4 Run the targeted regressions first, then `npm run lint`, `tsc -b`, the ROAM coverage checks, `npm test`, `knip`, `jscpd` and project pre-checks without weakening checks; confirm no capture-path regression
+- [ ] 12.5 After implementation and review, `/save` and verify the applicable gate, then open the HTTPS staging room on the user's Android Chrome phone from elsewhere and a second participant's laptop. Record the tested URL/version, device/browser and permissions; do not substitute a stand-alone probe
+- [ ] 12.6 Start from a non-default scan view while the phone faces an arbitrary direction. Verify no initial jump or height drop; walk one measured metre forward, sideways and back, and turn 90 and 180 degrees without stepping. Compare the phone's view with its relayed position and heading on the second participant; note scale uncertainty separately from transform correctness
+- [ ] 12.7 Recenter after moving and turning; verify the next stationary frame and shared pose do not jump. Stop, restart, refuse permission where reproducible, temporarily interrupt tracking, and background/return; verify clear status, no stale-position overwrite, no reversed exit heading and working touch controls
+- [ ] 12.8 Record frame rate and front-camera stream continuity during the joined walk, detail-tree load cost on the laptop, and unchanged desktop controls, notes and hand signs. Keep any unavailable physical check explicitly open rather than declaring the feature working
+- [ ] 12.9 Record acceptance evidence and any measured-scale follow-up in the Decision log; no real-room calibration, scale-constant change or new iPhone tracking engine belongs in this priority fix

@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -52,6 +52,7 @@ const open = async (at = '/apps/roam/', answers: Record<string, unknown> = {}, a
     render(<RouterProvider router={router} />)
   })
   await arrived()
+  await waitFor(() => expect(screen.queryByText('Checking phone movement…')).toBeNull())
   return router
 }
 const send = (event: Parameters<ComponentProps<typeof RoomViewer>['onEvent']>[0]) => act(() => viewer.props!.onEvent(event))

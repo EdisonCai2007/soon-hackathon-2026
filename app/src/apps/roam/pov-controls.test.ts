@@ -36,6 +36,25 @@ it('looking changes direction without moving the camera', () => {
   expect(camera.quaternion.angleTo(turn)).toBeGreaterThan(0.1)
 })
 
+it('ignores keyboard, drag and wheel input while another camera owns movement', () => {
+  const { camera, controls, key, pointer, canvas } = setup()
+  key('keydown', 'KeyW')
+  pointer('pointerdown', { clientX: 0, clientY: 0 })
+  controls.setEnabled(false)
+  key('keydown', 'KeyD')
+  pointer('pointermove', { clientX: 50, clientY: 50 })
+  canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))
+  controls.update(0.1)
+  expect(camera.position.toArray()).toEqual([2, 3, 4])
+  expect(camera.rotation.y).toBe(0)
+  controls.setEnabled(true)
+  pointer('pointermove', { clientX: 100, clientY: 50 })
+  expect(camera.rotation.y).toBe(0)
+  key('keydown', 'KeyW')
+  controls.update(0.1)
+  expect(camera.position.z).toBeCloseTo(3.9)
+})
+
 it('W moves forward horizontally and S reverses it', () => {
   const { camera, controls, key, near } = setup()
   key('keydown', 'KeyW')

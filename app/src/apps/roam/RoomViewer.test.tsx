@@ -286,7 +286,9 @@ it('places the voices on the sound card the page hands it', async () => {
 it('draws everything while the rate holds, and gives up detail where it cannot', async () => {
   const { draw } = await live()
   const spark = fakes.sparks[fakes.sparks.length - 1]
-  expect(spark.enableLod).toBe(false)
+  // The LOD path stays on from the first frame: the scan is a LOD tree, and nothing else draws it. No cap yet.
+  expect(spark.enableLod).toBe(true)
+  expect(spark.lodSplatCount).toBe(0)
   // Two seconds of warm-up, then two and a half at four frames a second: too slow, for long enough to matter.
   let time = 0
   for (let frame = 0; frame < 18; frame += 1) {
@@ -343,4 +345,33 @@ it('ignores a press on the room when the page is not listening for one', async (
   renderer.domElement.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 400 }) as DOMRect
   // No onPick: the press is simply the one that takes the keyboard, as it was before rooms existed.
   expect(() => renderer.domElement.dispatchEvent(new MouseEvent('click', { clientX: 400, clientY: 200 }))).not.toThrow()
+})
+
+it('pauses drawing, inputs and pose publication until the returned view is applied', async () => {
+  const onStance = vi.fn()
+  const onPick = vi.fn()
+  const props = { sceneUrl: '/apps/roam/scene.json', splatUrl: '/apps/roam/room.spz', onStance, onPick }
+  const { rerender, draw, renderer, onEvent, container } = await live({ onStance, onPick })
+  draw(0)
+  act(() => { pointer(container.firstElementChild!, 'pointerdown', { pointerType: 'touch' }) })
+  rerender(<RoomViewer {...props} onEvent={onEvent} pose={poseFor(scene, 'room')} paused />)
+  onStance.mockClear()
+  renderer.render.mockClear()
+  draw(1_000)
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+  renderer.domElement.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))
+  renderer.domElement.dispatchEvent(new MouseEvent('click', { clientX: 10, clientY: 10 }))
+  draw(2_000)
+  expect(renderer.render).not.toHaveBeenCalled()
+  expect(onStance).not.toHaveBeenCalled()
+  expect(onPick).not.toHaveBeenCalled()
+  expect(container.querySelector('[aria-label="Move through the room"]')).toBeNull()
+  const returned = { position: [2, 3, 4], target: [1, 3, 4], up: [0, 1, 0], fov: 55 } as const
+  rerender(<RoomViewer {...props} onEvent={onEvent}
+    pose={{ ...returned, position: [...returned.position], target: [...returned.target], up: [...returned.up] }} />)
+  expect(onStance).toHaveBeenCalledWith({ x: 2, y: 3, z: 4, yaw: expect.any(Number) })
+  expect(onStance.mock.calls[0][0].yaw).toBeCloseTo(Math.PI / 2, 12)
+  draw(3_000)
+  expect(renderer.render).toHaveBeenCalledTimes(1)
+  expect((renderer.render.mock.calls[0][1] as PerspectiveCamera).position.toArray()).toEqual([2, 3, 4])
 })

@@ -43,7 +43,7 @@ Constraints that carry over from [AR in the browser](../../../wiki/development/a
 
 **Three.js owns the session; the scan is moved to meet it.** `renderer.xr.enabled = true`, `renderer.xr.setReferenceSpaceType('local-floor')`, then `renderer.xr.setSession(session)`. From there `renderer.render(world, camera)` inside `renderer.setAnimationLoop` draws through `renderer.xr.getCamera()`, which is driven by the phone. The camera therefore cannot be positioned by the page, so the splat scan is positioned, turned and scaled instead, such that the lined-up spot sits at the session's origin. The alternative — keeping our own camera and setting it from `getViewerPose` each frame — loses the per-eye projection, the correct field of view and the compositor's reprojection, and fights Spark's existing XR path for no gain.
 
-**The placing transform is its own pure module.** Two nested groups, so the maths is a few assignments and every line is testable without a GPU:
+**The original placing transform is its own pure module.** The existing capture-oriented transform uses two nested groups:
 
 | | Set to | Why |
 |---|---|---|
@@ -51,7 +51,7 @@ Constraints that carry over from [AR in the browser](../../../wiki/development/a
 | outer group | `rotation.y = -anchor.yaw` | turns the scan so the spot's facing is the session's forward |
 | outer group | `scale = 1 / unitsPerMetre(scene)` | one real metre becomes one metre of scan |
 
-This is exactly the inverse of `toScanPose`, which is the point: the same anchor and the same `unitsPerMetre` place both the view and the notes, so they cannot disagree. A test asserts that round trip — a pose through `toScanPose`, then through this transform, lands back where it started.
+This is the inverse of `toScanPose`, but not of the guest hook's additional `fromOrigin` step. The priority correction below gives guests a complete transform and inverse, including the actual initial pose; keep the capture-only behavior unchanged.
 
 **`ar-session.ts` gains a drawing partner rather than a second loop.** `startAr(hooks, overlay, view?)`. With no `view` it behaves exactly as today, including the dummy layer, which is what `Phone.tsx` keeps using. With a `view` it skips the dummy layer, calls `view.take(session)`, and reads each pose inside the view's frame callback, so the session has one animation loop and one pose reader. Two loops on one session is legal and wasteful, and makes "which frame did this pose come from" unanswerable.
 
@@ -94,37 +94,45 @@ One cost, taken deliberately: the mesh now always asks for the level-of-detail t
 
 ### The guest's own device moves them
 
-**One movement vector, three sources.** `pov-controls.ts` already builds exactly one vector per frame in `update(dt)` and adds it to the camera. The pad and the keys both feed *that*, through one added method — `push(forward, side)`, cleared each frame — rather than either touching `camera.position`. The head offset is the one thing that is not movement, and it is applied separately, below. Two code paths moving one camera is how a drift between touch and keyboard would start, and it would show up as the two disagreeing about `speed`, the `Shift` boost and the `dt` clamp.
+**One movement vector for keys and touch.** `pov-controls.ts` builds one vector per frame in `update(dt)` and adds it to the camera. The pad and keys feed that through `push(forward, side)`, cleared each frame. Physical walking owns the view and its reported position only while the XR session is active; head-reading remains excluded.
 
 **The thumb pad is a plain function plus a thin control.** `thumb-pad.ts` turns a press origin and a current point into a `{ forward, side }` pair: a dead zone inside a few pixels, linear out to a fixed radius, clamped to one. That is the whole of the maths and it is tested with no DOM. `ThumbPad.tsx` is a positioned element in `Scan.tsx` that captures its own pointer and calls it — so the existing drag-to-look, which listens on the canvas, never sees the pad's pointer, and the click-to-pick handler cannot fire from a press that began on the pad. Shown when the view is touched rather than by sniffing the device: a `pointerdown` whose `pointerType` is `touch` reveals it, so a laptop with a touch screen gets it when it is used and never otherwise.
 
-**A guest's session is the same two modules, anchored differently.** `ar-view.ts` and `ar-place.ts` do not change for this. What differs is where the anchor comes from: standing in the real home it is a taped spot from `markedSpots`; joined from elsewhere there is no taped spot and no real room to line up with, so **the anchor is the camera's own pose at the press** — position, floor under it, and yaw from `stanceOf(camera)`. The person keeps the view they had and starts walking from it. One consequence worth stating: `ar-place.ts` therefore takes an `Anchor`, which `anchorAt` and `stanceOf` can both produce, and nothing in it knows which.
+**A guest's session uses a paired pose transform.** Capture the ordinary camera's position, including eye height, and its yaw at the start tap, then capture the first valid XR pose as the source origin. A guest mapping converts raw XR positions to scan positions by subtracting that origin, rotating by the difference in facing, applying `unitsPerMetre(scene)`, and adding the saved scan position. Height is the saved eye height plus the tracked height difference, not floor plus that difference. The inverse mapping places the rendered scan into XR space using the same inputs. Keep this math pure in the guest placement surface and use it for both rendering and reporting; do not change the capture-only `anchorAt`/`toScanPose` contract.
 
-**Carrying on walking re-anchors, it does not teleport.** *Carry on* (the guest's one extra press) takes where they have reached in the scan and makes where they are now physically standing the new origin, by re-anchoring with the current drawn pose and resetting the session's reference space offset. So a two-metre hallway at home crosses the whole home in a few presses, with nothing lost in between. The alternative, returning them to the middle of the home, throws away the only thing they were trying to keep. Jumping deliberately across the home is already the camera chooser's job.
+The first valid tracked pose maps exactly to the saved scan position and yaw. Regression tests use real Three.js camera directions, nonzero x/z/yaw origins, two floor heights, sideways and negative-Z-forward steps, and multiple turns. Assert the round trip and the actual rendered-world transform, not just mocked `lineUp` calls. Preserve tracked pitch and roll in the XR view; heading uses the camera's negative-Z-forward yaw convention. Returning to the ordinary view must use that convention too: the current `poseFacing` target uses positive Z and can reverse the heading. Change that conversion or use an explicitly guest-specific conversion after checking all callers.
+
+**Carrying on walking re-anchors, it does not teleport.** Capture the last valid raw XR pose and its mapped scan pose together, then replace both sides of the mapping atomically. With the phone still, the next rendered frame and reported position must be unchanged in x/y/z and facing. Apply the same reference to the drawing and reporting rather than resetting only the hook's origin. This does not create physical space or suppress the person's later steps back; larger travel remains available through touch controls and the camera chooser.
+
+**One movement mode owns the shared pose.** During starting, walking and stopping, `Scan.tsx` arbitrates the source; ignore ordinary-view callbacks while XR owns it, and update the local stance from valid XR poses as well as relaying them. Suspend the ordinary viewer's drawing and controls where practical without losing its scene or ready state. On exit, apply the last valid scan pose before re-enabling ordinary pose publication, preventing a stale callback from moving the peer back. Reset timestamps and raw/origin state for each new session; late callbacks from an ended session cannot mutate a newer one.
+
+**Read tracking validity without treating a stale camera as a new pose.** Keep one XR frame owner and read the camera Three.js already updates. Before implementation, inspect the installed Three.js frame/update contract and choose a validity signal that does not reintroduce the measured second-`getViewerPose` failure. Missing or emulated positional tracking must not publish invented movement. Pause reporting with a visible status until valid poses resume; end prolonged loss or a reference-space reset that cannot preserve continuity, returning to the last good view. Cover session refusal, no overlay, setup failure after session creation, pending start cancelled by Stop, context loss, and repeated start/stop with cleanup. This validity path needs device verification; the existing successful probe did not test it.
+
+**An obvious entry, not automatic sensor permission.** In the joined phone flow, show checking/loading before the scan and initial stance are ready, then promote *Walk it* above secondary actions with phone-specific instructions. Invoke `requestSession` from that explicit tap, before asynchronous work can lose user activation. Use capability detection, not an Android name check. Unsupported browsers keep working touch controls and a plain explanation. The start is not labelled walking until a valid pose arrives; wire scan-load progress to the overlay if loading remains. Denial gets a retry without changing the saved viewpoint.
 
 **The scan starts drawn, and failure ends the session.** There is no button to turn it off, for one reason: a guest who turned the scan off would be left looking at their own living room through their own camera, which is a view of nothing. So the scan is on from the first drawn frame, and the frame-rate floor and `webglcontextlost` both **end the session** and return them to the ordinary page view, where the pad and the drag still work.
 
 ## UX
 
-**Who and the job.** Somebody sent the link and joined from wherever they are — a sofa, a desk, a train — on a phone or a laptop. The job: get around the home and see it, without being told to hold keys they may not have. Done looks like having been somewhere: they walked into a room and looked at a thing. The common case is a phone, because that is what a shared link gets opened on, and the phone is exactly the case that cannot move today.
+### Use-case brief
 
-**The shortest flow.** Open the link → say your name → you are in the room → press the pad to walk, drag to look. On an Android phone, *Walk it* instead, and then it is your feet; *Carry on* when the real floor runs out; *Stop* to come back to the page.
+The priority user joins from somewhere other than the scanned home on Android Chrome. They want their steps and turns to control the scan and their shared place. Mirror the existing `Scan` screen at phone width, with the current thumb pad as the fallback. Assume one start per visit and occasional recentering; these are design assumptions, not measured usage. The common case is a supported phone and an explicit start tap; refusal, missing tracking and an interrupted session are visible recovery states.
 
-**Hierarchy.** The view fills the screen and the controls stay out of its way. The pad sits in the lower corner of the view, under a thumb, and appears on the first touch. *Walk it* sits beside *Hands on* in the bar that already holds it and the camera chooser, at the same weight. Inside a session there is one primary — *Carry on* — with *Stop* beside it, and a line saying the scan could not be carried if that is why the session ended. Nothing new is a dialog.
+### Flow
 
-```screen
-<div class="card col gap phone">
-  <div class="row gap"><span class="tag">walking · the lobby</span><span class="grow"></span><span class="tag-outline">Stop</span></div>
-  <div class="bar">the scanned home, filling the view</div>
-  <div class="row gap"><button class="btn-primary">Carry on</button><span class="grow"></span><span class="bar">turn your body to look</span></div>
-</div>
-```
+Open the link → say your name → scan loads → *Walk it* → waiting for valid tracking → steps and turns move the view. Touch remains an alternative. *Carry on from here* preserves the view while recentering; *Stop* restores ordinary controls at the reached position and heading. Missing tracking pauses movement; refusal or unrecoverable tracking loss returns to the saved view with an explanation.
 
-**Component inventory.** All existing: `Button`, `Badge`, and the bar in `Scan.tsx` that already holds *Hands on*. One new control, the pad, which is a plain positioned element rather than a component anything else reuses.
+### Hierarchy
+
+*Walk it* is the ready phone screen's primary action, not an unexplained peer of *Hands on*. Keep camera choices and hands secondary, and replace keyboard-only guidance on touch screens. During a walk, *Carry on from here* is primary and *Stop* remains easily reachable. Loading and tracking status use text and accessible status announcements, not color alone. Tracking loss leaves Stop available. No new dialog is needed.
+
+### Components
+
+Reuse `Button`, `Badge`, `Loading`, `Skeleton`, the existing bar, overlay and thumb pad. Extend the walk's state and status rather than introducing a second tracking widget.
 
 ### Review
 
-The review page is [`review.html`](review.html). The *What Changes* item that sketches a screen is **Every phone in a room can finally move**, which shows the guest's view with the pad on it; the walking session's own controls are sketched in the UX section above.
+The review page is [`review.html`](review.html). The proposal sketches the before/after joined-phone entry in **After joining, starting the walk is obvious**, the active overlay in **Starting, carrying on and stopping never jump you elsewhere**, and loading, waiting, loss, refusal and unsupported states in **The page says when it cannot follow you**.
 
 ## Risks / Trade-offs
 
@@ -133,7 +141,7 @@ The review page is [`review.html`](review.html). The *What Changes* item that sk
 - **A guest's AR session composites their own room behind the scan, and there is no way to stop it** → a phone browser has no VR mode to ask for, so where the splats are thin or absent the guest sees their own living room through the home. Accepted and said plainly rather than hidden.
 - **Walking a real floor while looking at somewhere else is how people hit furniture** → the session says *turn your body to look* and nothing invites a long walk; *Carry on from here* is the answer to a small room, so there is no reason to cross one. Nothing software can do removes this, and it is the bargain every AR page makes.
 - **The scale constant is a guess, so a guest's step may not cover a real metre of home** → a walk is what makes the error visible for the first time, and the fix is one line once the owner has looked.
-- **Tracking drifts over a long walk** → *Carry on from here* is also the correction: it re-anchors on the place the person believes they are.
+- **Tracking drifts over a long walk** → recentering preserves the current place but cannot discover absolute drift from an unscanned remote room. Do not promise real-room localization; end safely if the reference frame cannot be preserved.
 - **A phone's tracking reports the real floor, so a guest walking a flat room stays at one height in a scan with stairs** → correct and worth naming: the stairs are climbed by the pad or the camera chooser, not by walking at home.
 - **The pad could swallow a press meant for a person or a note** → the pad owns its own pointer through `setPointerCapture`, so the canvas never sees that press; the test is a press starting on the pad and ending over a figure, which must pick nobody.
 - **A weak machine's view now softens without anybody asking it to** → accepted, and the comparison is not a crisp view but the stutter it replaces: the owner's laptop drew at 2 fps at its worst. A machine that holds 24 fps sees no change at all.
@@ -148,4 +156,5 @@ Additive and reversible. No migration, no schema, no stored data, no route chang
 ## Open Questions
 
 - None outstanding. Measured and settled: a phone can stream its camera and report where it stands at once, the 60k budget holds 65–80 fps on a phone, and leaning costs more than the scan can spare.
-- Whether the scan sits on the real walls at the measured phone setting, which only the owner's eyes on a walk can answer.
+- The joined flow has not been reproduced on the user's phone. Acceptance is a remote guest's steps, turns and stable handoffs, observed locally and on a second participant, not alignment with real scanned walls.
+- Device evidence is still needed for the validity signal, camera streaming alongside the complete joined scan, and suspension of the ordinary renderer. These are implementation checks, not unanswered user preferences.
