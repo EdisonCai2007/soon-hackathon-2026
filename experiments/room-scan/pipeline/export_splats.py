@@ -7,6 +7,7 @@ parser=argparse.ArgumentParser(description='Clean a fitted PLY and export Three.
 parser.add_argument('--workdir',type=Path,required=True)
 parser.add_argument('--viewer',type=Path,required=True)
 parser.add_argument('--source',type=Path)
+parser.add_argument('--floors',help='Comma-separated floor heights in viewer coordinates, for a scan of several floors; the site stands people on the one under them.')
 args=parser.parse_args()
 ROOT=args.workdir.resolve()
 source=args.source.resolve() if args.source else ROOT/'room_trained.ply'
@@ -29,10 +30,10 @@ bound=np.quantile(viewer,[.005,.995],axis=0)
 poses=raw['camera_poses'][0]
 camera_views=[]
 sources=raw['sources'] if 'sources' in raw else np.zeros(len(poses),int)
-NAMES=['Video','New video','Bedroom video'];seen={}
+NAMES=['Video','New video','Bedroom video','Stairs video','Hallway video','Lobby video','Lobby night video'];seen={}
 def label(i):
     # Names are the viewer's keys: number a repeated frame instead of reusing its name.
-    n=f'{NAMES[sources[i]] if sources[i]<len(NAMES) else f"Video {sources[i]+1}"} {raw["times"][i]:g}s'
+    n=f'{NAMES[sources[i]] if sources[i]<len(NAMES) else f"Video {sources[i]+1}"} {round(float(raw["times"][i]),1):g}s'
     seen[n]=seen.get(n,0)+1;return n if seen[n]==1 else f'{n} ({seen[n]})'
 calibrations=[line.split() for line in (ROOT/'splat_dataset/sparse/0/cameras.txt').read_text().splitlines() if line and not line.startswith('#')]
 for i,pose in enumerate(poses):
@@ -45,6 +46,7 @@ report=json.loads(reportpath.read_text()) if reportpath.exists() else {}
 report={k:report[k] for k in ['steps','budget','wall_clock_s','final_psnr'] if k in report}
 meta={'splats':len(p),'views':len(poses),'bounds':bound.tolist(),'cutHeight':float(np.quantile(viewer[:,1],.72)),
       'rotation':A.tolist(),'translation':b.tolist(),'cameras':camera_views,'source':source.name,
+      **({'floors':sorted(float(f) for f in args.floors.split(','))} if args.floors else {}),
       'opacity_quantiles':np.quantile(op,[.1,.5,.9]).tolist(),'training_report':report}
 (out/'splat_scene.json').write_text(json.dumps(meta,indent=2))
 print(json.dumps({'source':source.name,'input':len(keep),'exported':len(p),'bounds':bound.tolist()},indent=2))

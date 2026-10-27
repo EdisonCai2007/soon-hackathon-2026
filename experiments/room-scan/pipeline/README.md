@@ -70,4 +70,16 @@ A long walk through several rooms smears when Pi3X sees it in one run, so recons
 5. **Train:** `prepare_update.py --no-masks --edits edits.npz` writes the dataset, then train as above.
 6. **Finish:** `cleanup_splats.py` drops splats the footage sees through near the door and clutter left on the floor; `splice_room.py` swaps one room for an earlier, sharper scan of it; `export_splats.py`, then `app/scripts/roam-ply-to-spz.mjs`.
 
+## Add another floor
+
+A new floor trains on its own and joins the existing splats, so the scanned floor stays as it is. Start one video where the scan already reaches (the top of the stairs), and film one shared spot, such as a mirror corner, at the start or end of every other video.
+
+1. **Pick frames:** `select_frames.py --window 0.5 --step 0.1` per video, then thin to one frame every 0.6–1 s. Keep each Pi3X run under about 110 frames on a 16 GB Mac.
+2. **Reconstruct per piece:** one run that mixes frames the scan already has (same video, same seconds) with the new video's first stretch; then the stairs; then one run per room, each with the shared spot's frames from the stairs video.
+3. **Stitch:** `extend_scan.py --plan plan.json` fits each piece to its parent through the shared frames and appends the new frames to the existing `reconstruction.npz`. Each owner names a video by file name.
+4. **Mask people:** `detect_people.py` caches a dilated Mask R-CNN mask per frame; it also catches people in mirrors.
+5. **Train:** `prepare_floor.py --chunk <pieces>` writes the dataset with people as transparent pixels, then train as above.
+6. **Clean:** `drop_people.py` deletes splats the training views mostly see inside a person mask, such as someone sitting still. `see_through.py` deletes splats newer footage sees straight past: run it on the old scan with the stairs video, and on the new floor with the old hall video.
+7. **Join:** `merge_floor.py --upper-floor a,b,c --prefer-floor x,z,r` keeps the old scan above its floor plane and the new floor below it; inside the circle at the top of the stairs only the new floor stays, because the old scan filled the stairwell with haze it glimpsed from above. Then `export_splats.py --workdir <merge output> --source <merge output>/room_merged.ply`, then `app/scripts/roam-ply-to-spz.mjs`.
+
 `fit_path.py` (fitting pieces to a hand-drawn floor map) and `remove_people.py` were tried and not used: a sketched map's proportions bent the hallway, and painting before training removed people better than deleting splats after.
